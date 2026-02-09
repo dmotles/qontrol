@@ -1,0 +1,1 @@
+{"id": "500", "name": "admin", "primary_group": "513", "sid": "S-1-5-21-875131741-2032918968-824250182-500", "uid": "0", "home_directory": null, "can_change_password": true, "privileges": ["PRIVILEGE_ACCESS_TOKENS_READ", "PRIVILEGE_ACCESS_TOKENS_WRITE"]}
