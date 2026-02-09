@@ -73,10 +73,7 @@ impl TestServer {
         let mock_server = MockServer::start().await;
         let temp_dir = TempDir::new().expect("failed to create temp dir");
 
-        // Create config directory: <tempdir>/qontrol/config.toml
-        let config_dir = temp_dir.path().join("qontrol");
-        std::fs::create_dir_all(&config_dir).expect("failed to create config dir");
-
+        // Write config.toml directly in temp dir; QONTROL_CONFIG_DIR points here
         let port = mock_server.address().port();
         let config_content = format!(
             r#"default_profile = "test"
@@ -88,7 +85,7 @@ token = "test-token"
 insecure = true
 "#
         );
-        std::fs::write(config_dir.join("config.toml"), config_content)
+        std::fs::write(temp_dir.path().join("config.toml"), config_content)
             .expect("failed to write config");
 
         Self {
@@ -127,8 +124,7 @@ insecure = true
     pub fn command(&self) -> Command {
         let mut cmd = Command::cargo_bin("qontrol").expect("binary not found");
         let port = self.mock_server.address().port();
-        cmd.env("XDG_CONFIG_HOME", self.temp_dir.path())
-            .env("HOME", self.temp_dir.path())
+        cmd.env("QONTROL_CONFIG_DIR", self.temp_dir.path())
             .env("QONTROL_BASE_URL", format!("http://127.0.0.1:{}", port));
         cmd
     }

@@ -22,8 +22,12 @@ pub struct ProfileEntry {
     pub insecure: bool,
 }
 
-/// Returns the config directory: ~/.config/qontrol/ on Linux, %APPDATA%\qontrol\ on Windows
+/// Returns the config directory: ~/.config/qontrol/ on Linux, %APPDATA%\qontrol\ on Windows.
+/// Override with QONTROL_CONFIG_DIR env var (used by test harness).
 pub fn config_dir() -> Result<PathBuf> {
+    if let Ok(dir) = std::env::var("QONTROL_CONFIG_DIR") {
+        return Ok(PathBuf::from(dir));
+    }
     let proj = directories::ProjectDirs::from("", "", "qontrol")
         .context("could not determine config directory")?;
     Ok(proj.config_dir().to_path_buf())
