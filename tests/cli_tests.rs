@@ -62,3 +62,64 @@ fn test_profile_subcommands_help() {
         .stdout(predicate::str::contains("remove"))
         .stdout(predicate::str::contains("show"));
 }
+
+#[test]
+fn test_fs_subcommands_help() {
+    Command::cargo_bin("qontrol")
+        .unwrap()
+        .args(["fs", "--help"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("ls"))
+        .stdout(predicate::str::contains("tree"))
+        .stdout(predicate::str::contains("stat"));
+}
+
+#[test]
+fn test_fs_ls_without_profile_shows_error() {
+    let temp = std::env::temp_dir().join("qontrol-test-fs-no-profile");
+    Command::cargo_bin("qontrol")
+        .unwrap()
+        .env("HOME", &temp)
+        .env("XDG_CONFIG_HOME", temp.join("config"))
+        .args(["fs", "ls", "/"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("no default profile configured"));
+}
+
+#[test]
+fn test_fs_stat_without_profile_shows_error() {
+    let temp = std::env::temp_dir().join("qontrol-test-fs-stat-no-profile");
+    Command::cargo_bin("qontrol")
+        .unwrap()
+        .env("HOME", &temp)
+        .env("XDG_CONFIG_HOME", temp.join("config"))
+        .args(["fs", "stat", "/"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("no default profile configured"));
+}
+
+#[test]
+fn test_fs_tree_without_profile_shows_error() {
+    let temp = std::env::temp_dir().join("qontrol-test-fs-tree-no-profile");
+    Command::cargo_bin("qontrol")
+        .unwrap()
+        .env("HOME", &temp)
+        .env("XDG_CONFIG_HOME", temp.join("config"))
+        .args(["fs", "tree", "/"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("no default profile configured"));
+}
+
+#[test]
+fn test_help_shows_fs_command() {
+    Command::cargo_bin("qontrol")
+        .unwrap()
+        .arg("--help")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("fs"));
+}

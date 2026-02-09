@@ -9,7 +9,7 @@ use anyhow::Result;
 use clap::Parser;
 use tracing_subscriber::EnvFilter;
 
-use cli::{ApiCommands, Cli, ClusterCommands, Commands, ProfileCommands};
+use cli::{ApiCommands, Cli, ClusterCommands, Commands, FsCommands, ProfileCommands};
 use client::QumuloClient;
 use config::{load_config, resolve_profile};
 
@@ -75,6 +75,27 @@ fn run(cli: Cli) -> Result<()> {
             let client = QumuloClient::new(&profile, cli.global_opts.timeout)?;
             match command {
                 ClusterCommands::Info => commands::cluster::info(&client, cli.global_opts.json),
+            }
+        }
+        Commands::Fs { command } => {
+            let config = load_config()?;
+            let (_, profile) = resolve_profile(&config, &cli.profile)?;
+            let client = QumuloClient::new(&profile, cli.global_opts.timeout)?;
+            match command {
+                FsCommands::Ls {
+                    path,
+                    long,
+                    sort,
+                    after,
+                    limit,
+                } => commands::fs::ls(&client, &path, long, &sort, after.as_deref(), limit, cli.global_opts.json),
+                FsCommands::Tree {
+                    path,
+                    max_depth,
+                } => commands::fs::tree(&client, &path, max_depth, cli.global_opts.json),
+                FsCommands::Stat { path } => {
+                    commands::fs::stat(&client, &path, cli.global_opts.json)
+                }
             }
         }
     }

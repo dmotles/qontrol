@@ -50,6 +50,11 @@ pub enum Commands {
         #[command(subcommand)]
         command: ClusterCommands,
     },
+    /// Filesystem browsing commands
+    Fs {
+        #[command(subcommand)]
+        command: FsCommands,
+    },
 }
 
 #[derive(Subcommand)]
@@ -106,4 +111,40 @@ pub enum ApiCommands {
 pub enum ClusterCommands {
     /// Show cluster information
     Info,
+}
+
+#[derive(Subcommand)]
+pub enum FsCommands {
+    /// List directory contents
+    Ls {
+        /// Path to list (default: /)
+        #[arg(default_value = "/")]
+        path: String,
+        /// Show detailed information (permissions, size, timestamps)
+        #[arg(short, long)]
+        long: bool,
+        /// Sort by field: name, size, type (default: name)
+        #[arg(short, long, default_value = "name")]
+        sort: String,
+        /// Page token for pagination (from previous results)
+        #[arg(long)]
+        after: Option<String>,
+        /// Maximum number of entries to return
+        #[arg(long)]
+        limit: Option<u32>,
+    },
+    /// Show recursive directory tree
+    Tree {
+        /// Path to show tree for (default: /)
+        #[arg(default_value = "/")]
+        path: String,
+        /// Maximum depth to recurse (default: 3)
+        #[arg(short = 'd', long, default_value = "3")]
+        max_depth: u32,
+    },
+    /// Show detailed file/directory attributes
+    Stat {
+        /// Path to inspect
+        path: String,
+    },
 }
