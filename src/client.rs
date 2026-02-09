@@ -89,4 +89,12 @@ impl QumuloClient {
     pub fn get_cluster_nodes(&self) -> Result<Value> {
         self.request("GET", "/v1/cluster/nodes/", None)
     }
+
+    pub fn get_file_system(&self) -> Result<Value> {
+        self.request("GET", "/v1/file-system", None)
+    }
+
+    pub fn get_activity_current(&self) -> Result<Value> {
+        self.request("GET", "/v1/analytics/activity/current", None)
+    }
 }

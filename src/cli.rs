@@ -50,6 +50,15 @@ pub enum Commands {
         #[command(subcommand)]
         command: ClusterCommands,
     },
+    /// Cluster health dashboard
+    Dashboard {
+        /// Continuously refresh the dashboard
+        #[arg(long)]
+        watch: bool,
+        /// Refresh interval in seconds (used with --watch)
+        #[arg(long, default_value = "5")]
+        interval: u64,
+    },
 }
 
 #[derive(Subcommand)]

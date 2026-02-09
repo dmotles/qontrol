@@ -62,3 +62,39 @@ fn test_profile_subcommands_help() {
         .stdout(predicate::str::contains("remove"))
         .stdout(predicate::str::contains("show"));
 }
+
+#[test]
+fn test_dashboard_help() {
+    Command::cargo_bin("qontrol")
+        .unwrap()
+        .args(["dashboard", "--help"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Cluster health dashboard"))
+        .stdout(predicate::str::contains("--watch"))
+        .stdout(predicate::str::contains("--interval"))
+        .stdout(predicate::str::contains("--json"));
+}
+
+#[test]
+fn test_dashboard_without_profile_shows_error() {
+    let temp = std::env::temp_dir().join("qontrol-test-dashboard-no-profile");
+    Command::cargo_bin("qontrol")
+        .unwrap()
+        .env("HOME", &temp)
+        .env("XDG_CONFIG_HOME", temp.join("config"))
+        .args(["dashboard"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("no default profile configured"));
+}
+
+#[test]
+fn test_help_lists_dashboard() {
+    Command::cargo_bin("qontrol")
+        .unwrap()
+        .arg("--help")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("dashboard"));
+}
