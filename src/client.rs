@@ -14,6 +14,30 @@ pub struct QumuloClient {
 }
 
 impl QumuloClient {
+    /// Create a client for a host without a saved profile (used during login flow).
+    pub fn from_host(
+        host: &str,
+        port: u16,
+        insecure: bool,
+        timeout_secs: u64,
+        token: &str,
+    ) -> Result<Self> {
+        let client = Client::builder()
+            .danger_accept_invalid_certs(insecure)
+            .timeout(Duration::from_secs(timeout_secs))
+            .build()
+            .context("failed to build HTTP client")?;
+
+        let base_url = std::env::var("QONTROL_BASE_URL")
+            .unwrap_or_else(|_| format!("https://{}:{}", host, port));
+
+        Ok(Self {
+            client,
+            base_url,
+            token: token.to_string(),
+        })
+    }
+
     pub fn new(profile: &ProfileEntry, timeout_secs: u64) -> Result<Self> {
         let client = Client::builder()
             .danger_accept_invalid_certs(profile.insecure)
@@ -70,6 +94,48 @@ impl QumuloClient {
         }
 
         // Handle empty responses (e.g. 204 No Content)
+        if response_body.is_empty() {
+            return Ok(Value::Null);
+        }
+
+        serde_json::from_str(&response_body).with_context(|| "failed to parse response as JSON")
+    }
+
+    /// Make an API request without the Authorization header (for unauthenticated endpoints like login).
+    pub fn request_no_auth(&self, method: &str, path: &str, body: Option<&Value>) -> Result<Value> {
+        let url = format!("{}{}", self.base_url, path);
+
+        tracing::debug!(%method, %url, "sending unauthenticated request");
+
+        let method = method
+            .parse::<reqwest::Method>()
+            .context("invalid HTTP method")?;
+
+        let mut req = self.client.request(method, &url);
+
+        if let Some(body) = body {
+            req = req.json(body);
+        }
+
+        let response = req
+            .send()
+            .with_context(|| format!("request to {} failed", url))?;
+
+        let status = response.status();
+        let response_body = response
+            .text()
+            .with_context(|| "failed to read response body")?;
+
+        tracing::debug!(status = %status.as_u16(), body_len = response_body.len(), "received response");
+
+        if !status.is_success() {
+            return Err(QontrolError::ApiError {
+                status: status.as_u16(),
+                body: response_body,
+            }
+            .into());
+        }
+
         if response_body.is_empty() {
             return Ok(Value::Null);
         }

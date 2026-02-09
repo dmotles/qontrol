@@ -73,19 +73,19 @@ pub enum Commands {
 
 #[derive(Subcommand)]
 pub enum ProfileCommands {
-    /// Add a new profile
+    /// Add a new profile (interactive login if --token is omitted)
     Add {
         /// Profile name
         name: String,
         /// Cluster hostname or IP
         #[arg(long)]
-        host: String,
+        host: Option<String>,
         /// REST API port
         #[arg(long, default_value = "8000")]
         port: u16,
-        /// Bearer token for authentication
+        /// Bearer token for authentication (skips interactive login)
         #[arg(long)]
-        token: String,
+        token: Option<String>,
         /// Skip TLS certificate verification
         #[arg(long)]
         insecure: bool,

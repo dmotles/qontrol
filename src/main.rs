@@ -53,7 +53,22 @@ fn run(cli: Cli) -> Result<()> {
                 token,
                 insecure,
                 default,
-            } => commands::profile::add(name, host, port, token, insecure, default),
+            } => {
+                if let Some(token) = token {
+                    let host = host
+                        .ok_or_else(|| anyhow::anyhow!("--host is required when using --token"))?;
+                    commands::profile::add(name, host, port, token, insecure, default)
+                } else {
+                    commands::profile::add_interactive(
+                        name,
+                        host,
+                        port,
+                        insecure,
+                        default,
+                        cli.global_opts.timeout,
+                    )
+                }
+            }
             ProfileCommands::List => commands::profile::list(),
             ProfileCommands::Remove { name } => commands::profile::remove(name),
             ProfileCommands::Show { name } => {
