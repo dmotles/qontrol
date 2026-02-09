@@ -1,0 +1,57 @@
+{
+  "child_count": 1,
+  "files": [
+    {
+      "access_time": "2026-01-08T00:52:38.361132279Z",
+      "blocks": "1",
+      "change_time": "2026-01-08T16:51:17.886316583Z",
+      "child_count": 43,
+      "creation_time": "2026-01-08T00:52:38.361132279Z",
+      "data_revision": null,
+      "datablocks": "0",
+      "directory_entry_hash_policy": "FS_DIRECTORY_HASH_VERSION_FOLDED",
+      "extended_attributes": {
+        "archive": false,
+        "compressed": false,
+        "hidden": false,
+        "not_content_indexed": false,
+        "offline": false,
+        "read_only": false,
+        "sparse_file": false,
+        "system": false,
+        "temporary": false
+      },
+      "file_number": "94127437418840285971493168915",
+      "group": "17179870521",
+      "group_details": {
+        "id_type": "NFS_GID",
+        "id_value": "1337"
+      },
+      "id": "94127437418840285971493168915",
+      "major_minor_numbers": {
+        "major": 0,
+        "minor": 0
+      },
+      "metablocks": "1",
+      "mode": "0755",
+      "modification_time": "2026-01-08T16:51:17.886316583Z",
+      "name": "dmotles",
+      "num_links": 21,
+      "owner": "12884903225",
+      "owner_details": {
+        "id_type": "NFS_UID",
+        "id_value": "1337"
+      },
+      "path": "/home/dmotles/",
+      "size": "22016",
+      "symlink_target_type": "FS_FILE_TYPE_UNKNOWN",
+      "type": "FS_FILE_TYPE_DIRECTORY",
+      "user_metadata_revision": "0"
+    }
+  ],
+  "id": "94127437418840285971493158915",
+  "paging": {
+    "next": ""
+  },
+  "path": "/home"
+}

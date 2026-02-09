@@ -1,0 +1,12 @@
+[
+  {
+    "id": 1,
+    "label": "00:22:48:b3:bf:e0",
+    "mac_address": "00:22:48:b3:bf:e0",
+    "model_number": "Azure",
+    "node_name": "dmotlesai-fs-1",
+    "node_status": "online",
+    "serial_number": "0000-0013-2075-7263-8626-9571-24",
+    "uuid": "b82bca3b-f17c-4be7-b30a-8f1e75f2eddd"
+  }
+]

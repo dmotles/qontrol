@@ -1,0 +1,30 @@
+{
+  "entries": [
+    {
+      "enabled": true,
+      "id": 1,
+      "policy_name": "daily-root",
+      "schedule": {
+        "creation_schedule": {
+          "frequency": "SCHEDULE_DAILY_OR_WEEKLY",
+          "hour": 8,
+          "minute": 0,
+          "on_days": [
+            "SUN",
+            "MON",
+            "TUE",
+            "WED",
+            "THU",
+            "FRI",
+            "SAT"
+          ],
+          "timezone": "UTC"
+        },
+        "expiration_time_to_live": "7days",
+        "id": 1
+      },
+      "snapshot_name_template": "{Year}{Month}{Day}-{Policy}",
+      "source_file_id": "94127437418840285971493158914"
+    }
+  ]
+}

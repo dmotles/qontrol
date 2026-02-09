@@ -1,0 +1,57 @@
+{
+  "child_count": 1,
+  "files": [
+    {
+      "access_time": "2026-01-08T00:52:38.357182213Z",
+      "blocks": "1",
+      "change_time": "2026-01-08T00:52:38.361132279Z",
+      "child_count": 1,
+      "creation_time": "2026-01-08T00:52:38.357182213Z",
+      "data_revision": null,
+      "datablocks": "0",
+      "directory_entry_hash_policy": "FS_DIRECTORY_HASH_VERSION_FOLDED",
+      "extended_attributes": {
+        "archive": false,
+        "compressed": false,
+        "hidden": false,
+        "not_content_indexed": false,
+        "offline": false,
+        "read_only": false,
+        "sparse_file": false,
+        "system": false,
+        "temporary": false
+      },
+      "file_number": "94127437418840285971493158915",
+      "group": "513",
+      "group_details": {
+        "id_type": "LOCAL_GROUP",
+        "id_value": "Users"
+      },
+      "id": "94127437418840285971493158915",
+      "major_minor_numbers": {
+        "major": 0,
+        "minor": 0
+      },
+      "metablocks": "1",
+      "mode": "0755",
+      "modification_time": "2026-01-08T00:52:38.361132279Z",
+      "name": "home",
+      "num_links": 3,
+      "owner": "500",
+      "owner_details": {
+        "id_type": "LOCAL_USER",
+        "id_value": "admin"
+      },
+      "path": "/home/",
+      "size": "512",
+      "symlink_target_type": "FS_FILE_TYPE_UNKNOWN",
+      "type": "FS_FILE_TYPE_DIRECTORY",
+      "user_metadata_revision": "0"
+    }
+  ],
+  "id": "94127437418840285971493158914",
+  "paging": {
+    "next": ""
+  },
+  "path": "/"
+}
