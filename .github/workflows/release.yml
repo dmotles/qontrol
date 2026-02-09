@@ -1,0 +1,19 @@
+name: Release
+
+# Placeholder for cargo-dist release workflow.
+# To set up:
+#   1. Install cargo-dist: cargo install cargo-dist
+#   2. Run: cargo dist init
+#   3. Replace this file with the generated workflow
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  placeholder:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: echo "Release workflow not yet configured. Run 'cargo dist init' to set up."
