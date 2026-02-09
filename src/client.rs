@@ -89,4 +89,35 @@ impl QumuloClient {
     pub fn get_cluster_nodes(&self) -> Result<Value> {
         self.request("GET", "/v1/cluster/nodes/", None)
     }
+
+    // Snapshot methods
+
+    pub fn get_snapshots(&self) -> Result<Value> {
+        self.request("GET", "/v4/snapshots/status/", None)
+    }
+
+    pub fn get_snapshot(&self, id: u64) -> Result<Value> {
+        self.request("GET", &format!("/v3/snapshots/{}", id), None)
+    }
+
+    pub fn get_snapshot_capacity_per_snapshot(&self) -> Result<Value> {
+        self.request("GET", "/v1/snapshots/capacity-used-per-snapshot/", None)
+    }
+
+    pub fn get_snapshot_policies(&self) -> Result<Value> {
+        self.request("GET", "/v3/snapshots/policies/", None)
+    }
+
+    pub fn calculate_snapshot_capacity(&self, ids: &[u64]) -> Result<Value> {
+        let body = Value::Array(ids.iter().map(|id| Value::from(*id)).collect());
+        self.request("POST", "/v1/snapshots/calculate-used-capacity", Some(&body))
+    }
+
+    pub fn get_snapshot_diff(&self, newer_id: u64, older_id: u64) -> Result<Value> {
+        self.request(
+            "GET",
+            &format!("/v2/snapshots/{}/changes-since/{}", newer_id, older_id),
+            None,
+        )
+    }
 }

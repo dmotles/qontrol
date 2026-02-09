@@ -50,6 +50,11 @@ pub enum Commands {
         #[command(subcommand)]
         command: ClusterCommands,
     },
+    /// Snapshot management
+    Snapshot {
+        #[command(subcommand)]
+        command: SnapshotCommands,
+    },
 }
 
 #[derive(Subcommand)]
@@ -106,4 +111,36 @@ pub enum ApiCommands {
 pub enum ClusterCommands {
     /// Show cluster information
     Info,
+}
+
+#[derive(Subcommand)]
+pub enum SnapshotCommands {
+    /// List all snapshots with capacity usage
+    List,
+    /// Show details for a specific snapshot
+    Show {
+        /// Snapshot ID
+        id: u64,
+    },
+    /// List snapshot policies
+    Policies,
+    /// Recommend snapshots for deletion using GFS retention
+    RecommendDelete {
+        /// Number of daily snapshots to keep
+        #[arg(long, default_value = "7")]
+        keep_daily: u32,
+        /// Number of weekly snapshots to keep
+        #[arg(long, default_value = "4")]
+        keep_weekly: u32,
+        /// Number of monthly snapshots to keep
+        #[arg(long, default_value = "3")]
+        keep_monthly: u32,
+    },
+    /// Show changes between two snapshots
+    Diff {
+        /// Newer snapshot ID
+        newer: u64,
+        /// Older snapshot ID
+        older: u64,
+    },
 }
