@@ -9,7 +9,9 @@ use anyhow::Result;
 use clap::Parser;
 use tracing_subscriber::EnvFilter;
 
-use cli::{ApiCommands, Cli, ClusterCommands, Commands, FsCommands, ProfileCommands, SnapshotCommands};
+use cli::{
+    ApiCommands, Cli, ClusterCommands, Commands, FsCommands, ProfileCommands, SnapshotCommands,
+};
 use client::QumuloClient;
 use config::{load_config, resolve_profile};
 
@@ -88,9 +90,7 @@ fn run(cli: Cli) -> Result<()> {
             let (_, profile) = resolve_profile(&config, &cli.profile)?;
             let client = QumuloClient::new(&profile, cli.global_opts.timeout)?;
             match command {
-                SnapshotCommands::List => {
-                    commands::snapshot::list(&client, cli.global_opts.json)
-                }
+                SnapshotCommands::List => commands::snapshot::list(&client, cli.global_opts.json),
                 SnapshotCommands::Show { id } => {
                     commands::snapshot::show(&client, id, cli.global_opts.json)
                 }
@@ -124,11 +124,18 @@ fn run(cli: Cli) -> Result<()> {
                     sort,
                     after,
                     limit,
-                } => commands::fs::ls(&client, &path, long, &sort, after.as_deref(), limit, cli.global_opts.json),
-                FsCommands::Tree {
-                    path,
-                    max_depth,
-                } => commands::fs::tree(&client, &path, max_depth, cli.global_opts.json),
+                } => commands::fs::ls(
+                    &client,
+                    &path,
+                    long,
+                    &sort,
+                    after.as_deref(),
+                    limit,
+                    cli.global_opts.json,
+                ),
+                FsCommands::Tree { path, max_depth } => {
+                    commands::fs::tree(&client, &path, max_depth, cli.global_opts.json)
+                }
                 FsCommands::Stat { path } => {
                     commands::fs::stat(&client, &path, cli.global_opts.json)
                 }

@@ -37,9 +37,7 @@ pub fn list(client: &QumuloClient, json_mode: bool) -> Result<()> {
         for entry in entries {
             if let (Some(id), Some(bytes)) = (
                 entry.get("id").and_then(|v| v.as_u64()),
-                entry
-                    .get("capacity_used_bytes")
-                    .and_then(|v| v.as_str()),
+                entry.get("capacity_used_bytes").and_then(|v| v.as_str()),
             ) {
                 cap_map.insert(id, bytes.to_string());
             }
@@ -53,10 +51,10 @@ pub fn list(client: &QumuloClient, json_mode: bool) -> Result<()> {
             for entry in entries.iter_mut() {
                 if let Some(id) = entry.get("id").and_then(|v| v.as_u64()) {
                     if let Some(bytes) = cap_map.get(&id) {
-                        entry
-                            .as_object_mut()
-                            .unwrap()
-                            .insert("capacity_used_bytes".to_string(), Value::String(bytes.clone()));
+                        entry.as_object_mut().unwrap().insert(
+                            "capacity_used_bytes".to_string(),
+                            Value::String(bytes.clone()),
+                        );
                     }
                 }
             }
@@ -85,17 +83,19 @@ pub fn list(client: &QumuloClient, json_mode: bool) -> Result<()> {
             let mut e = entry.clone();
             let id = entry.get("id").and_then(|v| v.as_u64()).unwrap_or(0);
             let bytes = cap_map.get(&id).map(|s| s.as_str()).unwrap_or("0");
-            e.as_object_mut().unwrap().insert(
-                "capacity".to_string(),
-                Value::String(format_bytes(bytes)),
-            );
+            e.as_object_mut()
+                .unwrap()
+                .insert("capacity".to_string(), Value::String(format_bytes(bytes)));
             e
         })
         .collect();
 
     let arr = Value::Array(enriched);
     print_value(&arr, false, |val| {
-        print_table(val, &["id", "name", "timestamp", "source_file_path", "policy_name", "capacity"]);
+        print_table(
+            val,
+            &["id", "name", "timestamp", "directory_name", "capacity"],
+        );
     });
 
     Ok(())
@@ -113,35 +113,50 @@ pub fn show(client: &QumuloClient, id: u64, json_mode: bool) -> Result<()> {
     }
 
     let name = snap.get("name").and_then(|v| v.as_str()).unwrap_or("-");
-    let timestamp = snap.get("timestamp").and_then(|v| v.as_str()).unwrap_or("-");
-    let source = snap.get("source_file_id").and_then(|v| v.as_str()).unwrap_or("-");
-    let policy_id = snap
-        .get("policy_id")
-        .map(|v| {
-            if v.is_null() {
-                "manual".to_string()
-            } else {
-                v.to_string()
-            }
-        })
-        .unwrap_or_else(|| "-".to_string());
+    let timestamp = snap
+        .get("timestamp")
+        .and_then(|v| v.as_str())
+        .unwrap_or("-");
+    let source = snap
+        .get("source_file_id")
+        .and_then(|v| v.as_str())
+        .unwrap_or("-");
+    let dir_name = snap
+        .get("directory_name")
+        .and_then(|v| v.as_str())
+        .unwrap_or("-");
+    let created_by_policy = snap
+        .get("created_by_policy")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
     let expiration = snap
         .get("expiration")
         .map(|v| {
-            if v.is_null() {
+            if v.is_null() || v.as_str().is_some_and(|s| s.is_empty()) {
                 "never".to_string()
             } else {
                 v.as_str().unwrap_or("-").to_string()
             }
         })
         .unwrap_or_else(|| "-".to_string());
-    let in_delete = snap.get("in_delete").and_then(|v| v.as_bool()).unwrap_or(false);
+    let in_delete = snap
+        .get("in_delete")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
 
     println!("Snapshot {}", id);
     println!("  Name:        {}", name);
     println!("  Created:     {}", timestamp);
-    println!("  Source:      {}", source);
-    println!("  Policy:      {}", policy_id);
+    println!("  Source ID:   {}", source);
+    println!("  Directory:   {}", dir_name);
+    println!(
+        "  Policy:      {}",
+        if created_by_policy {
+            "policy"
+        } else {
+            "manual"
+        }
+    );
     println!("  Expiration:  {}", expiration);
     println!("  Deleting:    {}", in_delete);
 
@@ -197,7 +212,10 @@ pub fn policies(client: &QumuloClient, json_mode: bool) -> Result<()> {
 
     let arr = Value::Array(display);
     print_value(&arr, false, |val| {
-        print_table(val, &["id", "policy_name", "status", "source_file_id", "ttl"]);
+        print_table(
+            val,
+            &["id", "policy_name", "status", "source_file_id", "ttl"],
+        );
     });
 
     Ok(())
@@ -291,8 +309,10 @@ pub fn recommend_delete(
         }
     }
 
-    let deletable: Vec<&(u64, String, NaiveDate)> =
-        snapshots.iter().filter(|s| !keep_set.contains(&s.0)).collect();
+    let deletable: Vec<&(u64, String, NaiveDate)> = snapshots
+        .iter()
+        .filter(|s| !keep_set.contains(&s.0))
+        .collect();
 
     if json_mode {
         let deletable_ids: Vec<u64> = deletable.iter().map(|s| s.0).collect();
@@ -342,10 +362,7 @@ pub fn recommend_delete(
     // Calculate space savings
     let deletable_ids: Vec<u64> = deletable.iter().map(|s| s.0).collect();
     let savings = client.calculate_snapshot_capacity(&deletable_ids)?;
-    let savings_bytes = savings
-        .get("bytes")
-        .and_then(|v| v.as_str())
-        .unwrap_or("0");
+    let savings_bytes = savings.get("bytes").and_then(|v| v.as_str()).unwrap_or("0");
 
     println!("Estimated space savings: {}", format_bytes(savings_bytes));
     println!();

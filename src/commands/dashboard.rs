@@ -62,9 +62,7 @@ fn print_dashboard(data: &Value) {
     let cluster_name = data["cluster"]["cluster_name"]
         .as_str()
         .unwrap_or("unknown");
-    let revision = data["version"]["revision_id"]
-        .as_str()
-        .unwrap_or("unknown");
+    let revision = data["version"]["revision_id"].as_str().unwrap_or("unknown");
     let build_id = data["version"]["build_id"].as_str().unwrap_or("");
 
     println!(
@@ -113,7 +111,13 @@ fn print_dashboard(data: &Value) {
             } else {
                 red.apply_to("●")
             };
-            println!("  {} {} (id: {}) {}", marker, name, id, dim.apply_to(status));
+            println!(
+                "  {} {} (id: {}) {}",
+                marker,
+                name,
+                id,
+                dim.apply_to(status)
+            );
         }
         println!();
     }
@@ -150,7 +154,10 @@ fn print_dashboard(data: &Value) {
             green.apply_to(format_bytes(free_bytes))
         );
         if snapshot_bytes > 0 {
-            println!("  Snapshots: {}", dim.apply_to(format_bytes(snapshot_bytes)));
+            println!(
+                "  Snapshots: {}",
+                dim.apply_to(format_bytes(snapshot_bytes))
+            );
         }
         println!();
     }
@@ -313,7 +320,10 @@ mod tests {
 
     #[test]
     fn test_parse_byte_string() {
-        assert_eq!(parse_byte_string(&json!("1099511627776")), 1_099_511_627_776);
+        assert_eq!(
+            parse_byte_string(&json!("1099511627776")),
+            1_099_511_627_776
+        );
         assert_eq!(parse_byte_string(&json!(1024)), 1024);
         assert_eq!(parse_byte_string(&json!(null)), 0);
         assert_eq!(parse_byte_string(&json!("not_a_number")), 0);

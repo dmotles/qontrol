@@ -63,12 +63,7 @@ pub fn ls(
 }
 
 /// Show recursive directory tree
-pub fn tree(
-    client: &QumuloClient,
-    path: &str,
-    max_depth: u32,
-    json_mode: bool,
-) -> Result<()> {
+pub fn tree(client: &QumuloClient, path: &str, max_depth: u32, json_mode: bool) -> Result<()> {
     if json_mode {
         let mut result = json!({
             "path": path,
@@ -124,8 +119,16 @@ fn sort_entries(entries: &mut [Value], sort: &str) {
     match sort {
         "size" => {
             entries.sort_by(|a, b| {
-                let size_a = a.get("size").and_then(|v| v.as_str()).and_then(|s| s.parse::<u64>().ok()).unwrap_or(0);
-                let size_b = b.get("size").and_then(|v| v.as_str()).and_then(|s| s.parse::<u64>().ok()).unwrap_or(0);
+                let size_a = a
+                    .get("size")
+                    .and_then(|v| v.as_str())
+                    .and_then(|s| s.parse::<u64>().ok())
+                    .unwrap_or(0);
+                let size_b = b
+                    .get("size")
+                    .and_then(|v| v.as_str())
+                    .and_then(|s| s.parse::<u64>().ok())
+                    .unwrap_or(0);
                 size_b.cmp(&size_a) // largest first
             });
         }
@@ -155,7 +158,10 @@ fn print_short_listing(entries: &[Value]) {
 
     for entry in entries {
         let name = entry.get("name").and_then(|v| v.as_str()).unwrap_or("?");
-        let entry_type = entry.get("type").and_then(|v| v.as_str()).unwrap_or("FS_FILE_TYPE_FILE");
+        let entry_type = entry
+            .get("type")
+            .and_then(|v| v.as_str())
+            .unwrap_or("FS_FILE_TYPE_FILE");
 
         let styled_name = match entry_type {
             "FS_FILE_TYPE_DIRECTORY" => dir_style.apply_to(name).to_string(),
@@ -179,7 +185,13 @@ fn print_long_listing(entries: &[Value]) {
     let mut max_id_len = 2; // "ID"
 
     for entry in entries {
-        let size_str = format_size(entry.get("size").and_then(|v| v.as_str()).and_then(|s| s.parse::<u64>().ok()).unwrap_or(0));
+        let size_str = format_size(
+            entry
+                .get("size")
+                .and_then(|v| v.as_str())
+                .and_then(|s| s.parse::<u64>().ok())
+                .unwrap_or(0),
+        );
         max_size_len = max_size_len.max(size_str.len());
 
         let owner = entry.get("owner").and_then(|v| v.as_str()).unwrap_or("-");
@@ -219,11 +231,12 @@ fn print_long_listing(entries: &[Value]) {
             .get("type")
             .and_then(|v| v.as_str())
             .unwrap_or("FS_FILE_TYPE_FILE");
-        let size = entry.get("size").and_then(|v| v.as_str()).and_then(|s| s.parse::<u64>().ok()).unwrap_or(0);
-        let owner = entry
-            .get("owner")
+        let size = entry
+            .get("size")
             .and_then(|v| v.as_str())
-            .unwrap_or("-");
+            .and_then(|s| s.parse::<u64>().ok())
+            .unwrap_or(0);
+        let owner = entry.get("owner").and_then(|v| v.as_str()).unwrap_or("-");
         let id = format_value(entry.get("id").unwrap_or(&Value::Null));
         let modified = entry
             .get("modification_time")
@@ -289,7 +302,11 @@ fn print_tree_recursive(
     let total = sorted_entries.len();
     for (i, entry) in sorted_entries.iter().enumerate() {
         let is_last = i == total - 1;
-        let connector = if is_last { "\u{2514}\u{2500}\u{2500} " } else { "\u{251c}\u{2500}\u{2500} " };
+        let connector = if is_last {
+            "\u{2514}\u{2500}\u{2500} "
+        } else {
+            "\u{251c}\u{2500}\u{2500} "
+        };
         let child_prefix = if is_last { "    " } else { "\u{2502}   " };
 
         let name = entry.get("name").and_then(|v| v.as_str()).unwrap_or("?");
@@ -305,7 +322,11 @@ fn print_tree_recursive(
         };
 
         let size_info = if entry_type != "FS_FILE_TYPE_DIRECTORY" {
-            let size = entry.get("size").and_then(|v| v.as_str()).and_then(|s| s.parse::<u64>().ok()).unwrap_or(0);
+            let size = entry
+                .get("size")
+                .and_then(|v| v.as_str())
+                .and_then(|s| s.parse::<u64>().ok())
+                .unwrap_or(0);
             format!("  [{}]", format_size(size))
         } else {
             String::new()
@@ -320,7 +341,13 @@ fn print_tree_recursive(
                 format!("{}/{}", path, name)
             };
             let new_prefix = format!("{}{}", prefix, child_prefix);
-            print_tree_recursive(client, &child_path, max_depth, current_depth + 1, &new_prefix)?;
+            print_tree_recursive(
+                client,
+                &child_path,
+                max_depth,
+                current_depth + 1,
+                &new_prefix,
+            )?;
         }
     }
 
@@ -453,10 +480,7 @@ fn print_aggregates_summary(aggregates: &Value) {
         if stream_bytes > 0 {
             println!(
                 "{}",
-                dim_style.apply_to(format!(
-                    "named stream data: {}",
-                    format_size(stream_bytes)
-                ))
+                dim_style.apply_to(format!("named stream data: {}", format_size(stream_bytes)))
             );
         }
     }
@@ -485,10 +509,7 @@ fn format_size(bytes: u64) -> String {
 /// Truncate ISO timestamp to "YYYY-MM-DD HH:MM:SS"
 fn truncate_timestamp(ts: &str) -> String {
     // Qumulo timestamps are like "2024-01-15T10:30:45.123456Z"
-    ts.replace('T', " ")
-        .chars()
-        .take(19)
-        .collect()
+    ts.replace('T', " ").chars().take(19).collect()
 }
 
 #[cfg(test)]
@@ -532,10 +553,7 @@ mod tests {
 
     #[test]
     fn test_truncate_timestamp_short() {
-        assert_eq!(
-            truncate_timestamp("2024-01-15T10:30"),
-            "2024-01-15 10:30"
-        );
+        assert_eq!(truncate_timestamp("2024-01-15T10:30"), "2024-01-15 10:30");
     }
 
     #[test]

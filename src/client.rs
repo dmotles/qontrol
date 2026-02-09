@@ -101,11 +101,11 @@ impl QumuloClient {
     // Snapshot methods
 
     pub fn get_snapshots(&self) -> Result<Value> {
-        self.request("GET", "/v4/snapshots/status/", None)
+        self.request("GET", "/v2/snapshots/", None)
     }
 
     pub fn get_snapshot(&self, id: u64) -> Result<Value> {
-        self.request("GET", &format!("/v3/snapshots/{}", id), None)
+        self.request("GET", &format!("/v2/snapshots/{}", id), None)
     }
 
     pub fn get_snapshot_capacity_per_snapshot(&self) -> Result<Value> {
@@ -113,7 +113,7 @@ impl QumuloClient {
     }
 
     pub fn get_snapshot_policies(&self) -> Result<Value> {
-        self.request("GET", "/v3/snapshots/policies/", None)
+        self.request("GET", "/v2/snapshots/policies/", None)
     }
 
     pub fn calculate_snapshot_capacity(&self, ids: &[u64]) -> Result<Value> {
@@ -139,7 +139,10 @@ impl QumuloClient {
         limit: Option<u32>,
     ) -> Result<Value> {
         let encoded = urlencoding::encode(path);
-        let mut url = format!("/v1/files/%2F{}/entries/", encoded.trim_start_matches("%2F"));
+        let mut url = format!(
+            "/v1/files/%2F{}/entries/",
+            encoded.trim_start_matches("%2F")
+        );
         // Root path is special - just /v1/files/%2F/entries/
         if path == "/" {
             url = "/v1/files/%2F/entries/".to_string();
@@ -160,7 +163,10 @@ impl QumuloClient {
     /// Get file/directory attributes
     pub fn get_file_attr(&self, path: &str) -> Result<Value> {
         let encoded = urlencoding::encode(path);
-        let mut url = format!("/v1/files/%2F{}/info/attributes", encoded.trim_start_matches("%2F"));
+        let mut url = format!(
+            "/v1/files/%2F{}/info/attributes",
+            encoded.trim_start_matches("%2F")
+        );
         if path == "/" {
             url = "/v1/files/%2F/info/attributes".to_string();
         }
@@ -171,7 +177,10 @@ impl QumuloClient {
     #[allow(dead_code)]
     pub fn get_file_aggregates(&self, path: &str) -> Result<Value> {
         let encoded = urlencoding::encode(path);
-        let mut url = format!("/v1/files/%2F{}/aggregates/", encoded.trim_start_matches("%2F"));
+        let mut url = format!(
+            "/v1/files/%2F{}/aggregates/",
+            encoded.trim_start_matches("%2F")
+        );
         if path == "/" {
             url = "/v1/files/%2F/aggregates/".to_string();
         }
