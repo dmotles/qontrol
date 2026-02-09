@@ -45,14 +45,21 @@ const FIXTURE_ROUTES: &[(&str, &str, &str)] = &[
         "GET",
         "/v1/files/%2F/recursive-aggregates/",
     ),
-    ("snapshots_status", "GET", "/v4/snapshots/status/"),
+    ("snapshots_list", "GET", "/v2/snapshots/"),
+    ("snapshots_status", "GET", "/v2/snapshots/status/"),
     (
         "snapshots_capacity",
         "GET",
         "/v1/snapshots/capacity-used-per-snapshot/",
     ),
-    ("snapshots_policies", "GET", "/v3/snapshots/policies/"),
-    ("snapshot_single", "GET", "/v3/snapshots/1"),
+    ("snapshots_policies", "GET", "/v2/snapshots/policies/"),
+    ("snapshot_single", "GET", "/v2/snapshots/1"),
+    ("snapshot_status_single", "GET", "/v2/snapshots/status/1"),
+    (
+        "snapshots_total_capacity",
+        "GET",
+        "/v1/snapshots/total-used-capacity",
+    ),
 ];
 
 pub struct TestServer {
