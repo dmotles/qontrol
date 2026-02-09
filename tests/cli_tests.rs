@@ -98,3 +98,40 @@ fn test_help_lists_dashboard() {
         .success()
         .stdout(predicate::str::contains("dashboard"));
 }
+
+#[test]
+fn test_snapshot_subcommands_help() {
+    Command::cargo_bin("qontrol")
+        .unwrap()
+        .args(["snapshot", "--help"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("list"))
+        .stdout(predicate::str::contains("show"))
+        .stdout(predicate::str::contains("policies"))
+        .stdout(predicate::str::contains("recommend-delete"))
+        .stdout(predicate::str::contains("diff"));
+}
+
+#[test]
+fn test_snapshot_list_without_profile_shows_error() {
+    let temp = std::env::temp_dir().join("qontrol-test-snap-no-profile");
+    Command::cargo_bin("qontrol")
+        .unwrap()
+        .env("HOME", &temp)
+        .env("XDG_CONFIG_HOME", temp.join("config"))
+        .args(["snapshot", "list"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("no default profile configured"));
+}
+
+#[test]
+fn test_help_shows_snapshot_command() {
+    Command::cargo_bin("qontrol")
+        .unwrap()
+        .arg("--help")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("snapshot"));
+}

@@ -9,7 +9,7 @@ use anyhow::Result;
 use clap::Parser;
 use tracing_subscriber::EnvFilter;
 
-use cli::{ApiCommands, Cli, ClusterCommands, Commands, ProfileCommands};
+use cli::{ApiCommands, Cli, ClusterCommands, Commands, ProfileCommands, SnapshotCommands};
 use client::QumuloClient;
 use config::{load_config, resolve_profile};
 
@@ -82,6 +82,36 @@ fn run(cli: Cli) -> Result<()> {
             let (_, profile) = resolve_profile(&config, &cli.profile)?;
             let client = QumuloClient::new(&profile, cli.global_opts.timeout)?;
             commands::dashboard::run(&client, cli.global_opts.json, watch, interval)
+        }
+        Commands::Snapshot { command } => {
+            let config = load_config()?;
+            let (_, profile) = resolve_profile(&config, &cli.profile)?;
+            let client = QumuloClient::new(&profile, cli.global_opts.timeout)?;
+            match command {
+                SnapshotCommands::List => {
+                    commands::snapshot::list(&client, cli.global_opts.json)
+                }
+                SnapshotCommands::Show { id } => {
+                    commands::snapshot::show(&client, id, cli.global_opts.json)
+                }
+                SnapshotCommands::Policies => {
+                    commands::snapshot::policies(&client, cli.global_opts.json)
+                }
+                SnapshotCommands::RecommendDelete {
+                    keep_daily,
+                    keep_weekly,
+                    keep_monthly,
+                } => commands::snapshot::recommend_delete(
+                    &client,
+                    keep_daily,
+                    keep_weekly,
+                    keep_monthly,
+                    cli.global_opts.json,
+                ),
+                SnapshotCommands::Diff { newer, older } => {
+                    commands::snapshot::diff(&client, newer, older, cli.global_opts.json)
+                }
+            }
         }
     }
 }
