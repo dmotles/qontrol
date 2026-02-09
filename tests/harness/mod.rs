@@ -27,14 +27,14 @@ const FIXTURE_ROUTES: &[(&str, &str, &str)] = &[
     ("version", "GET", "/v1/version"),
     ("cluster_nodes", "GET", "/v1/cluster/nodes/"),
     ("filesystem", "GET", "/v1/file-system"),
-    ("analytics_activity", "GET", "/v1/analytics/activity/current"),
+    (
+        "analytics_activity",
+        "GET",
+        "/v1/analytics/activity/current",
+    ),
     ("fs_entries_root", "GET", "/v1/files/%2F/entries/"),
     ("fs_entries_home", "GET", "/v1/files/%2Fhome/entries/"),
-    (
-        "fs_attributes_root",
-        "GET",
-        "/v1/files/%2F/info/attributes",
-    ),
+    ("fs_attributes_root", "GET", "/v1/files/%2F/info/attributes"),
     (
         "fs_attributes_home",
         "GET",
@@ -110,10 +110,7 @@ insecure = true
 
         Mock::given(method(*http_method))
             .and(path(*api_path))
-            .respond_with(
-                ResponseTemplate::new(200)
-                    .set_body_raw(body, "application/json"),
-            )
+            .respond_with(ResponseTemplate::new(200).set_body_raw(body, "application/json"))
             .mount(&self.mock_server)
             .await;
     }
@@ -132,10 +129,7 @@ insecure = true
         let port = self.mock_server.address().port();
         cmd.env("XDG_CONFIG_HOME", self.temp_dir.path())
             .env("HOME", self.temp_dir.path())
-            .env(
-                "QONTROL_BASE_URL",
-                format!("http://127.0.0.1:{}", port),
-            );
+            .env("QONTROL_BASE_URL", format!("http://127.0.0.1:{}", port));
         cmd
     }
 }

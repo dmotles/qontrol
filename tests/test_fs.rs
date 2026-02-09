@@ -93,8 +93,12 @@ async fn test_fs_stat_json() {
 #[tokio::test]
 async fn test_fs_tree() {
     let ts = harness::TestServer::start().await;
-    ts.mount_fixtures(&["fs_entries_root", "fs_entries_home", "fs_recursive_aggregates_root"])
-        .await;
+    ts.mount_fixtures(&[
+        "fs_entries_root",
+        "fs_entries_home",
+        "fs_recursive_aggregates_root",
+    ])
+    .await;
 
     ts.command()
         .args(["fs", "tree", "/", "--max-depth", "1"])

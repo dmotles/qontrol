@@ -5,7 +5,8 @@ use predicates::prelude::*;
 #[tokio::test]
 async fn test_snapshot_list() {
     let ts = harness::TestServer::start().await;
-    ts.mount_fixtures(&["snapshots_list", "snapshots_capacity"]).await;
+    ts.mount_fixtures(&["snapshots_list", "snapshots_capacity"])
+        .await;
 
     ts.command()
         .args(["snapshot", "list"])
@@ -17,7 +18,8 @@ async fn test_snapshot_list() {
 #[tokio::test]
 async fn test_snapshot_list_json() {
     let ts = harness::TestServer::start().await;
-    ts.mount_fixtures(&["snapshots_list", "snapshots_capacity"]).await;
+    ts.mount_fixtures(&["snapshots_list", "snapshots_capacity"])
+        .await;
 
     let output = ts
         .command()
