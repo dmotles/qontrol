@@ -128,4 +128,66 @@ impl QumuloClient {
             None,
         )
     }
+
+    // Convenience methods for filesystem commands
+
+    /// List directory entries at a given path (by ref like inode ID or path)
+    pub fn get_file_entries(
+        &self,
+        path: &str,
+        after: Option<&str>,
+        limit: Option<u32>,
+    ) -> Result<Value> {
+        let encoded = urlencoding::encode(path);
+        let mut url = format!("/v1/files/%2F{}/entries/", encoded.trim_start_matches("%2F"));
+        // Root path is special - just /v1/files/%2F/entries/
+        if path == "/" {
+            url = "/v1/files/%2F/entries/".to_string();
+        }
+        let mut params = Vec::new();
+        if let Some(after) = after {
+            params.push(format!("after={}", urlencoding::encode(after)));
+        }
+        if let Some(limit) = limit {
+            params.push(format!("limit={}", limit));
+        }
+        if !params.is_empty() {
+            url = format!("{}?{}", url, params.join("&"));
+        }
+        self.request("GET", &url, None)
+    }
+
+    /// Get file/directory attributes
+    pub fn get_file_attr(&self, path: &str) -> Result<Value> {
+        let encoded = urlencoding::encode(path);
+        let mut url = format!("/v1/files/%2F{}/info/attributes", encoded.trim_start_matches("%2F"));
+        if path == "/" {
+            url = "/v1/files/%2F/info/attributes".to_string();
+        }
+        self.request("GET", &url, None)
+    }
+
+    /// Get aggregated data for a path (file count, size totals, etc.)
+    #[allow(dead_code)]
+    pub fn get_file_aggregates(&self, path: &str) -> Result<Value> {
+        let encoded = urlencoding::encode(path);
+        let mut url = format!("/v1/files/%2F{}/aggregates/", encoded.trim_start_matches("%2F"));
+        if path == "/" {
+            url = "/v1/files/%2F/aggregates/".to_string();
+        }
+        self.request("GET", &url, None)
+    }
+
+    /// Get recursive aggregates for a path
+    pub fn get_file_recursive_aggregates(&self, path: &str) -> Result<Value> {
+        let encoded = urlencoding::encode(path);
+        let mut url = format!(
+            "/v1/files/%2F{}/recursive-aggregates/",
+            encoded.trim_start_matches("%2F")
+        );
+        if path == "/" {
+            url = "/v1/files/%2F/recursive-aggregates/".to_string();
+        }
+        self.request("GET", &url, None)
+    }
 }

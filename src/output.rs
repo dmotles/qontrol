@@ -72,7 +72,7 @@ pub fn print_table(items: &Value, columns: &[&str]) {
 }
 
 /// Format a JSON value for human-readable display
-fn format_value(value: &Value) -> String {
+pub fn format_value(value: &Value) -> String {
     match value {
         Value::String(s) => s.clone(),
         Value::Number(n) => n.to_string(),
