@@ -191,3 +191,35 @@ async fn test_fs_tree() {
         .success()
         .stdout(predicate::str::contains("home"));
 }
+
+#[tokio::test]
+async fn test_fs_tree_multi_page() {
+    let ts = harness::TestServer::start().await;
+
+    // Page 1: only when 'after' param is absent - returns home + etc, paging.next = "etc"
+    ts.mount_fixture_without_query(
+        "fs_entries_root_page1",
+        "GET",
+        "/v1/files/%2F/entries/",
+        "after",
+    )
+    .await;
+    // Page 2: after=etc - returns var, paging.next = ""
+    ts.mount_fixture_with_query(
+        "fs_entries_root_page2",
+        "GET",
+        "/v1/files/%2F/entries/",
+        "after",
+        "etc",
+    )
+    .await;
+    ts.mount_fixture("fs_recursive_aggregates_root").await;
+
+    ts.command()
+        .args(["fs", "tree", "/", "--max-depth", "1"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("home"))
+        .stdout(predicate::str::contains("etc"))
+        .stdout(predicate::str::contains("var"));
+}
