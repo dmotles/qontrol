@@ -64,20 +64,20 @@ fn test_profile_subcommands_help() {
 }
 
 #[test]
-fn test_dashboard_help() {
+fn test_dashboard_alias_shows_status_help() {
+    // `dashboard` is now an alias for `status`
     Command::cargo_bin("qontrol")
         .unwrap()
         .args(["dashboard", "--help"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("Cluster health dashboard"))
+        .stdout(predicate::str::contains("Multi-cluster environment status"))
         .stdout(predicate::str::contains("--watch"))
-        .stdout(predicate::str::contains("--interval"))
-        .stdout(predicate::str::contains("--json"));
+        .stdout(predicate::str::contains("--interval"));
 }
 
 #[test]
-fn test_dashboard_without_profile_shows_error() {
+fn test_dashboard_alias_without_profile_shows_error() {
     let temp = std::env::temp_dir().join("qontrol-test-dashboard-no-profile");
     Command::cargo_bin("qontrol")
         .unwrap()
@@ -86,17 +86,17 @@ fn test_dashboard_without_profile_shows_error() {
         .args(["dashboard"])
         .assert()
         .failure()
-        .stderr(predicate::str::contains("no default profile configured"));
+        .stderr(predicate::str::contains("no matching profiles found"));
 }
 
 #[test]
-fn test_help_lists_dashboard() {
+fn test_help_lists_status_command() {
     Command::cargo_bin("qontrol")
         .unwrap()
         .arg("--help")
         .assert()
         .success()
-        .stdout(predicate::str::contains("dashboard"));
+        .stdout(predicate::str::contains("status"));
 }
 
 #[test]

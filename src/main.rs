@@ -100,12 +100,6 @@ fn run(cli: Cli) -> Result<()> {
                 ClusterCommands::Info => commands::cluster::info(&client, cli.global_opts.json),
             }
         }
-        Commands::Dashboard { watch, interval } => {
-            let config = load_config()?;
-            let (_, profile) = resolve_profile(&config, &cli.profile)?;
-            let client = QumuloClient::new(&profile, cli.global_opts.timeout)?;
-            commands::dashboard::run(&client, cli.global_opts.json, watch, interval)
-        }
         Commands::Snapshot { command } => {
             let config = load_config()?;
             let (_, profile) = resolve_profile(&config, &cli.profile)?;
