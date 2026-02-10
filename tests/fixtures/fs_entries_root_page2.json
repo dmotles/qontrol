@@ -1,0 +1,57 @@
+{
+  "child_count": 3,
+  "files": [
+    {
+      "access_time": "2026-01-08T02:00:00.000000000Z",
+      "blocks": "8",
+      "change_time": "2026-01-08T02:00:00.000000000Z",
+      "child_count": 0,
+      "creation_time": "2026-01-08T02:00:00.000000000Z",
+      "data_revision": null,
+      "datablocks": "8",
+      "directory_entry_hash_policy": null,
+      "extended_attributes": {
+        "archive": false,
+        "compressed": false,
+        "hidden": false,
+        "not_content_indexed": false,
+        "offline": false,
+        "read_only": false,
+        "sparse_file": false,
+        "system": false,
+        "temporary": false
+      },
+      "file_number": "94127437418840285971493158917",
+      "group": "513",
+      "group_details": {
+        "id_type": "LOCAL_GROUP",
+        "id_value": "Users"
+      },
+      "id": "94127437418840285971493158917",
+      "major_minor_numbers": {
+        "major": 0,
+        "minor": 0
+      },
+      "metablocks": "1",
+      "mode": "0644",
+      "modification_time": "2026-01-08T02:00:00.000000000Z",
+      "name": "var",
+      "num_links": 1,
+      "owner": "500",
+      "owner_details": {
+        "id_type": "LOCAL_USER",
+        "id_value": "admin"
+      },
+      "path": "/var/",
+      "size": "4096",
+      "symlink_target_type": "FS_FILE_TYPE_UNKNOWN",
+      "type": "FS_FILE_TYPE_DIRECTORY",
+      "user_metadata_revision": "0"
+    }
+  ],
+  "id": "94127437418840285971493158914",
+  "paging": {
+    "next": ""
+  },
+  "path": "/"
+}

@@ -254,6 +254,35 @@ impl QumuloClient {
         self.request("GET", &url, None)
     }
 
+    /// Fetch all directory entries by paginating through all pages.
+    /// Returns a Vec of all file entry objects.
+    pub fn get_all_file_entries(&self, path: &str) -> Result<Vec<Value>> {
+        let mut all_entries = Vec::new();
+        let mut after: Option<String> = None;
+
+        loop {
+            let response = self.get_file_entries(path, after.as_deref(), None)?;
+
+            if let Some(files) = response.get("files").and_then(|v| v.as_array()) {
+                all_entries.extend(files.iter().cloned());
+            }
+
+            // Check if there's a next page
+            match response
+                .get("paging")
+                .and_then(|p| p.get("next"))
+                .and_then(|n| n.as_str())
+            {
+                Some(next) if !next.is_empty() => {
+                    after = Some(next.to_string());
+                }
+                _ => break,
+            }
+        }
+
+        Ok(all_entries)
+    }
+
     /// Get recursive aggregates for a path
     pub fn get_file_recursive_aggregates(&self, path: &str) -> Result<Value> {
         let encoded = urlencoding::encode(path);

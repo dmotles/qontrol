@@ -1,3 +1,5 @@
+use std::io::{self, IsTerminal, Write};
+
 use anyhow::{Context, Result};
 use console::Style;
 use serde_json::{json, Value};
@@ -5,60 +7,165 @@ use serde_json::{json, Value};
 use crate::client::QumuloClient;
 use crate::output::{format_value, print_value};
 
-/// List directory contents
+/// List directory contents with auto-pagination
 pub fn ls(
     client: &QumuloClient,
     path: &str,
     long: bool,
     sort: &str,
-    after: Option<&str>,
     limit: Option<u32>,
     json_mode: bool,
 ) -> Result<()> {
-    let response = client
-        .get_file_entries(path, after, limit)
-        .with_context(|| format!("failed to list directory: {}", path))?;
-
     if json_mode {
-        println!(
-            "{}",
-            serde_json::to_string_pretty(&response).unwrap_or_else(|_| response.to_string())
-        );
-        return Ok(());
+        return ls_json(client, path, limit);
     }
 
-    let entries = response
-        .get("files")
-        .and_then(|v| v.as_array())
-        .cloned()
-        .unwrap_or_default();
+    let is_tty = io::stderr().is_terminal();
+    let mut total_count: u64 = 0;
+    let mut after: Option<String> = None;
+    let mut all_entries: Vec<Value> = Vec::new();
+    let remaining_limit = limit;
 
-    if entries.is_empty() {
+    loop {
+        let page_limit = remaining_limit.map(|l| {
+            let fetched = total_count as u32;
+            if l > fetched { l - fetched } else { 0 }
+        });
+
+        // If we've already hit the limit, stop
+        if let Some(0) = page_limit {
+            break;
+        }
+
+        let response = client
+            .get_file_entries(path, after.as_deref(), page_limit)
+            .with_context(|| format!("failed to list directory: {}", path))?;
+
+        let entries = response
+            .get("files")
+            .and_then(|v| v.as_array())
+            .cloned()
+            .unwrap_or_default();
+
+        total_count += entries.len() as u64;
+        all_entries.extend(entries);
+
+        // Show progress on stderr for TTY
+        if is_tty && total_count > 0 {
+            eprint!("\r\x1b[K(loading... {} entries)", total_count);
+            io::stderr().flush().ok();
+        }
+
+        // Check if there's a next page
+        let has_next = response
+            .get("paging")
+            .and_then(|p| p.get("next"))
+            .and_then(|n| n.as_str())
+            .is_some_and(|n| !n.is_empty());
+
+        if !has_next {
+            break;
+        }
+
+        // Check if we've hit the limit
+        if let Some(l) = remaining_limit {
+            if total_count >= l as u64 {
+                break;
+            }
+        }
+
+        after = response
+            .get("paging")
+            .and_then(|p| p.get("next"))
+            .and_then(|n| n.as_str())
+            .map(|s| s.to_string());
+    }
+
+    // Clear progress line
+    if is_tty && total_count > 0 {
+        eprint!("\r\x1b[K");
+        io::stderr().flush().ok();
+    }
+
+    if all_entries.is_empty() {
         println!("(empty directory)");
         return Ok(());
     }
 
-    let mut entries = entries;
-    sort_entries(&mut entries, sort);
+    sort_entries(&mut all_entries, sort);
 
     if long {
-        print_long_listing(&entries);
+        print_long_listing(&all_entries);
     } else {
-        print_short_listing(&entries);
+        print_short_listing(&all_entries);
     }
 
-    // Show pagination hint if there are more results
-    if let Some(paging) = response.get("paging") {
-        if let Some(next) = paging.get("next").and_then(|v| v.as_str()) {
-            if !next.is_empty() {
-                eprintln!(
-                    "\n(more results available, use --after \"{}\" to continue)",
-                    next
-                );
+    // Show summary count on stderr
+    eprintln!("{} entries", total_count);
+
+    Ok(())
+}
+
+/// JSON mode: collect all pages into a single JSON array response
+fn ls_json(client: &QumuloClient, path: &str, limit: Option<u32>) -> Result<()> {
+    let mut all_files: Vec<Value> = Vec::new();
+    let mut after: Option<String> = None;
+    let mut last_response: Option<Value> = None;
+
+    loop {
+        let page_limit = limit.map(|l| {
+            let fetched = all_files.len() as u32;
+            if l > fetched { l - fetched } else { 0 }
+        });
+
+        if let Some(0) = page_limit {
+            break;
+        }
+
+        let response = client
+            .get_file_entries(path, after.as_deref(), page_limit)
+            .with_context(|| format!("failed to list directory: {}", path))?;
+
+        if let Some(files) = response.get("files").and_then(|v| v.as_array()) {
+            all_files.extend(files.iter().cloned());
+        }
+
+        let has_next = response
+            .get("paging")
+            .and_then(|p| p.get("next"))
+            .and_then(|n| n.as_str())
+            .is_some_and(|n| !n.is_empty());
+
+        last_response = Some(response);
+
+        if !has_next {
+            break;
+        }
+
+        if let Some(l) = limit {
+            if all_files.len() >= l as usize {
+                break;
             }
         }
+
+        after = last_response
+            .as_ref()
+            .and_then(|r| r.get("paging"))
+            .and_then(|p| p.get("next"))
+            .and_then(|n| n.as_str())
+            .map(|s| s.to_string());
     }
 
+    // Build combined response using structure from last response
+    let mut result = last_response.unwrap_or_else(|| json!({}));
+    result["files"] = Value::Array(all_files);
+    // Clear paging since we've fetched everything
+    result["paging"] = json!({"next": ""});
+
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string())
+    );
     Ok(())
 }
 
@@ -283,15 +390,9 @@ fn print_tree_recursive(
         return Ok(());
     }
 
-    let response = client
-        .get_file_entries(path, None, None)
+    let entries = client
+        .get_all_file_entries(path)
         .with_context(|| format!("failed to list directory: {}", path))?;
-
-    let entries = response
-        .get("files")
-        .and_then(|v| v.as_array())
-        .cloned()
-        .unwrap_or_default();
 
     let mut sorted_entries = entries;
     sort_entries(&mut sorted_entries, "name");
@@ -360,15 +461,9 @@ fn build_tree_json(
     max_depth: u32,
     current_depth: u32,
 ) -> Result<Value> {
-    let response = client
-        .get_file_entries(path, None, None)
+    let entries = client
+        .get_all_file_entries(path)
         .with_context(|| format!("failed to list directory: {}", path))?;
-
-    let entries = response
-        .get("files")
-        .and_then(|v| v.as_array())
-        .cloned()
-        .unwrap_or_default();
 
     let mut result = Vec::new();
     for entry in &entries {

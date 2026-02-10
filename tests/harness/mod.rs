@@ -18,7 +18,7 @@ use std::path::{Path, PathBuf};
 
 use assert_cmd::Command;
 use tempfile::TempDir;
-use wiremock::matchers::{method, path};
+use wiremock::matchers::{method, path, query_param, query_param_is_missing};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
 /// Maps fixture name → (HTTP method, API path)
@@ -120,6 +120,47 @@ insecure = true
         for name in names {
             self.mount_fixture(name).await;
         }
+    }
+
+    /// Mount a fixture on a specific API path, only matching when the given query param is absent.
+    pub async fn mount_fixture_without_query(
+        &self,
+        fixture_name: &str,
+        http_method: &str,
+        api_path: &str,
+        absent_param: &str,
+    ) {
+        let fixture_path = fixtures_dir().join(format!("{}.json", fixture_name));
+        let body = std::fs::read_to_string(&fixture_path)
+            .unwrap_or_else(|_| panic!("failed to read fixture: {}", fixture_path.display()));
+
+        Mock::given(method(http_method))
+            .and(path(api_path))
+            .and(query_param_is_missing(absent_param))
+            .respond_with(ResponseTemplate::new(200).set_body_raw(body, "application/json"))
+            .mount(&self.mock_server)
+            .await;
+    }
+
+    /// Mount a fixture on a specific API path with a required query parameter.
+    pub async fn mount_fixture_with_query(
+        &self,
+        fixture_name: &str,
+        http_method: &str,
+        api_path: &str,
+        query_key: &str,
+        query_value: &str,
+    ) {
+        let fixture_path = fixtures_dir().join(format!("{}.json", fixture_name));
+        let body = std::fs::read_to_string(&fixture_path)
+            .unwrap_or_else(|_| panic!("failed to read fixture: {}", fixture_path.display()));
+
+        Mock::given(method(http_method))
+            .and(path(api_path))
+            .and(query_param(query_key, query_value))
+            .respond_with(ResponseTemplate::new(200).set_body_raw(body, "application/json"))
+            .mount(&self.mock_server)
+            .await;
     }
 
     /// Mount an error response for a given API path.
