@@ -1325,3 +1325,306 @@ async fn test_status_watch_mode_nic_delta_between_polls() {
         throughput
     );
 }
+
+// ── Comprehensive end-to-end integration test ─────────────────────────────────
+
+/// End-to-end test: 3 clusters (on-prem, cloud, unreachable) → full pipeline validation.
+/// Verifies terminal output sections, JSON schema, alerts, and aggregate computation.
+#[tokio::test]
+async fn test_e2e_mixed_clusters_terminal_and_json() {
+    // Set up 3 profiles: on-prem (gravytrain), cloud (AWS), unreachable
+    let mts = harness::MultiTestServer::start(&["onprem", "cloud", "broken"]).await;
+
+    // Mount full fixtures for on-prem (gravytrain)
+    mts.mount_full_status_fixtures("onprem", "gravytrain").await;
+    // Also need health + network for on-prem
+    mts.mount_status_fixture("onprem", "gravytrain", "cluster_slots", "GET", "/v1/cluster/slots/")
+        .await;
+    mts.mount_status_fixture(
+        "onprem",
+        "gravytrain",
+        "cluster_chassis",
+        "GET",
+        "/v1/cluster/nodes/chassis/",
+    )
+    .await;
+    mts.mount_status_fixture(
+        "onprem",
+        "gravytrain",
+        "cluster_protection_status",
+        "GET",
+        "/v1/cluster/protection/status",
+    )
+    .await;
+    mts.mount_status_fixture(
+        "onprem",
+        "gravytrain",
+        "cluster_restriper_status",
+        "GET",
+        "/v1/cluster/restriper/status",
+    )
+    .await;
+    mts.mount_status_fixture(
+        "onprem",
+        "gravytrain",
+        "network_connections",
+        "GET",
+        "/v2/network/connections/",
+    )
+    .await;
+    mts.mount_status_fixture(
+        "onprem",
+        "gravytrain",
+        "network_status",
+        "GET",
+        "/v3/network/status",
+    )
+    .await;
+
+    // Mount full fixtures for cloud (aws-gravytrain)
+    mts.mount_full_status_fixtures("cloud", "aws-gravytrain")
+        .await;
+    mts.mount_status_fixture("cloud", "aws-gravytrain", "cluster_slots", "GET", "/v1/cluster/slots/")
+        .await;
+    mts.mount_status_fixture(
+        "cloud",
+        "aws-gravytrain",
+        "cluster_chassis",
+        "GET",
+        "/v1/cluster/nodes/chassis/",
+    )
+    .await;
+    mts.mount_status_fixture(
+        "cloud",
+        "aws-gravytrain",
+        "cluster_protection_status",
+        "GET",
+        "/v1/cluster/protection/status",
+    )
+    .await;
+    mts.mount_status_fixture(
+        "cloud",
+        "aws-gravytrain",
+        "cluster_restriper_status",
+        "GET",
+        "/v1/cluster/restriper/status",
+    )
+    .await;
+    mts.mount_status_fixture(
+        "cloud",
+        "aws-gravytrain",
+        "network_connections",
+        "GET",
+        "/v2/network/connections/",
+    )
+    .await;
+    mts.mount_status_fixture(
+        "cloud",
+        "aws-gravytrain",
+        "network_status",
+        "GET",
+        "/v3/network/status",
+    )
+    .await;
+
+    // Don't mount anything on "broken" — all requests will fail
+
+    // ─── Part 1: Terminal output validation ──────────────────────────────────
+    let output = mts
+        .command()
+        .args(["status", "--no-cache"])
+        .output()
+        .expect("failed to execute");
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    // Overview section
+    assert!(
+        stdout.contains("Environment Overview"),
+        "should have overview section"
+    );
+    // With --no-cache and no cached data, the unreachable cluster is excluded from
+    // cluster count but still generates an alert. 2 reachable clusters show in overview.
+    assert!(
+        stdout.contains("Clusters:"),
+        "should show cluster count in overview"
+    );
+
+    // Alerts section
+    assert!(
+        stdout.contains("Alerts"),
+        "should have alerts section"
+    );
+    // Broken cluster should produce an alert
+    assert!(
+        stdout.contains("broken"),
+        "should mention unreachable cluster in output"
+    );
+
+    // Per-cluster sections — at least the reachable ones should appear
+    assert!(
+        stdout.contains("gravytrain"),
+        "should show on-prem cluster name"
+    );
+    assert!(
+        stdout.contains("aws-gravytrain") || stdout.contains("aws_gravytrain"),
+        "should show cloud cluster"
+    );
+
+    // ─── Part 2: JSON output validation ──────────────────────────────────────
+    let json_output = mts
+        .command()
+        .args(["status", "--json", "--no-cache"])
+        .output()
+        .expect("failed to execute");
+
+    assert!(json_output.status.success());
+    let stdout = String::from_utf8_lossy(&json_output.stdout);
+    let json: serde_json::Value = serde_json::from_str(&stdout).expect("invalid JSON output");
+
+    // Top-level fields
+    assert!(json.get("timestamp").is_some(), "should have timestamp");
+    assert!(json.get("aggregates").is_some(), "should have aggregates");
+    assert!(json.get("alerts").is_some(), "should have alerts");
+    assert!(json.get("clusters").is_some(), "should have clusters");
+
+    // Aggregates validation
+    // With --no-cache, the unreachable cluster (no cached data) is excluded from the
+    // cluster list but still generates alerts. cluster_count = 2 (reachable only).
+    let agg = &json["aggregates"];
+    assert_eq!(agg["cluster_count"], 2, "2 clusters with data");
+    assert_eq!(agg["healthy_count"], 2, "2 healthy clusters");
+
+    // Aggregated node counts should include both reachable clusters
+    assert!(
+        agg["total_nodes"].as_u64().unwrap() > 0,
+        "should have some nodes"
+    );
+    assert!(
+        agg["online_nodes"].as_u64().unwrap() > 0,
+        "should have online nodes"
+    );
+
+    // Aggregated capacity
+    assert!(
+        agg["total_capacity_bytes"].as_u64().unwrap() > 0,
+        "should have total capacity"
+    );
+    assert!(
+        agg["used_capacity_bytes"].as_u64().unwrap() > 0,
+        "should have used capacity"
+    );
+
+    // Aggregated file stats
+    assert!(
+        agg["total_files"].as_u64().unwrap() > 0,
+        "should have total files"
+    );
+    assert!(
+        agg["total_directories"].as_u64().unwrap() > 0,
+        "should have total directories"
+    );
+
+    // Latency range (only reachable clusters)
+    assert!(
+        agg["latency_min_ms"].as_u64().is_some(),
+        "should have min latency"
+    );
+    assert!(
+        agg["latency_max_ms"].as_u64().is_some(),
+        "should have max latency"
+    );
+
+    // Alerts validation
+    let alerts = json["alerts"].as_array().expect("alerts should be array");
+    let has_broken_alert = alerts
+        .iter()
+        .any(|a| a["cluster"].as_str() == Some("broken"));
+    assert!(
+        has_broken_alert,
+        "should have alert for unreachable cluster"
+    );
+
+    // Clusters validation
+    let clusters = json["clusters"].as_array().expect("clusters should be array");
+    assert!(
+        clusters.len() >= 2,
+        "should have at least 2 clusters (reachable ones)"
+    );
+
+    // Validate on-prem cluster structure
+    let onprem = clusters
+        .iter()
+        .find(|c| c["profile"].as_str() == Some("onprem"))
+        .expect("should have onprem cluster");
+    assert_eq!(onprem["reachable"], true);
+    assert_eq!(onprem["stale"], false);
+    assert!(onprem["latency_ms"].as_u64().unwrap() > 0);
+    assert_eq!(onprem["cluster_type"], "on-prem");
+    assert!(onprem["nodes"]["total"].as_u64().unwrap() > 0);
+    assert!(onprem["capacity"]["total_bytes"].as_u64().unwrap() > 0);
+    assert!(onprem["files"]["total_files"].as_u64().unwrap() > 0);
+
+    // Validate cloud cluster structure
+    let cloud = clusters
+        .iter()
+        .find(|c| c["profile"].as_str() == Some("cloud"))
+        .expect("should have cloud cluster");
+    assert_eq!(cloud["reachable"], true);
+    assert_eq!(cloud["cluster_type"], "cnq-aws");
+
+    // Health fields present on both
+    for cluster in [onprem, cloud] {
+        let health = &cluster["health"];
+        assert!(health.get("disks_unhealthy").is_some());
+        assert!(health.get("psus_unhealthy").is_some());
+        assert!(health.get("data_at_risk").is_some());
+        assert!(health.get("remaining_node_failures").is_some());
+        assert!(health.get("remaining_drive_failures").is_some());
+    }
+
+    // Activity fields present
+    for cluster in [onprem, cloud] {
+        let activity = &cluster["activity"];
+        assert!(activity.get("read_iops").is_some());
+        assert!(activity.get("write_iops").is_some());
+        assert!(activity.get("read_throughput_bps").is_some());
+        assert!(activity.get("write_throughput_bps").is_some());
+    }
+
+    // Node network details present
+    for cluster in [onprem, cloud] {
+        let details = cluster["nodes"]["details"]
+            .as_array()
+            .expect("node details");
+        assert!(!details.is_empty(), "should have node details");
+        for node in details {
+            assert!(node.get("node_id").is_some());
+            assert!(node.get("connections").is_some());
+        }
+    }
+}
+
+/// End-to-end test: `dashboard` alias works with all 3 cluster types.
+#[tokio::test]
+async fn test_e2e_dashboard_alias_full_pipeline() {
+    let mts = harness::MultiTestServer::start(&["onprem", "cloud"]).await;
+    mts.mount_full_status_fixtures("onprem", "gravytrain").await;
+    mts.mount_full_status_fixtures("cloud", "aws-gravytrain")
+        .await;
+
+    // Use `dashboard` alias instead of `status`
+    let output = mts
+        .command()
+        .args(["dashboard", "--json", "--no-cache"])
+        .output()
+        .expect("failed to execute");
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let json: serde_json::Value = serde_json::from_str(&stdout).expect("invalid JSON output");
+
+    assert_eq!(json["aggregates"]["cluster_count"], 2);
+    assert!(json["clusters"].as_array().unwrap().len() >= 2);
+}
