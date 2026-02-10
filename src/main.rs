@@ -134,6 +134,23 @@ fn run(cli: Cli) -> Result<()> {
                 }
             }
         }
+        Commands::Status {
+            watch,
+            interval,
+            profiles,
+            no_cache,
+        } => {
+            let config = load_config()?;
+            commands::status::run(
+                &config,
+                &profiles,
+                cli.global_opts.json,
+                watch,
+                interval,
+                no_cache,
+                cli.global_opts.timeout,
+            )
+        }
         Commands::Fs { command } => {
             let config = load_config()?;
             let (_, profile) = resolve_profile(&config, &cli.profile)?;

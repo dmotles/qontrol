@@ -186,6 +186,94 @@ insecure = true
     }
 }
 
+/// Multi-profile test harness: each profile gets its own mock server.
+pub struct MultiTestServer {
+    pub servers: Vec<(String, MockServer)>,
+    pub temp_dir: TempDir,
+}
+
+impl MultiTestServer {
+    /// Start mock servers for each profile name and write a config with all profiles.
+    pub async fn start(profile_names: &[&str]) -> Self {
+        let temp_dir = TempDir::new().expect("failed to create temp dir");
+        let mut servers = Vec::new();
+        let mut config_sections = Vec::new();
+
+        let default = profile_names.first().copied().unwrap_or("default");
+        config_sections.push(format!("default_profile = \"{}\"", default));
+
+        for name in profile_names {
+            let mock_server = MockServer::start().await;
+            let port = mock_server.address().port();
+            config_sections.push(format!(
+                r#"
+[profiles.{name}]
+host = "127.0.0.1"
+port = {port}
+token = "test-token-{name}"
+insecure = true
+base_url = "http://127.0.0.1:{port}"
+"#
+            ));
+            servers.push((name.to_string(), mock_server));
+        }
+
+        std::fs::write(
+            temp_dir.path().join("config.toml"),
+            config_sections.join("\n"),
+        )
+        .expect("failed to write config");
+
+        Self { servers, temp_dir }
+    }
+
+    /// Mount a fixture on a specific profile's mock server.
+    pub async fn mount_fixture(&self, profile: &str, name: &str) {
+        let (_, server) = self
+            .servers
+            .iter()
+            .find(|(n, _)| n == profile)
+            .unwrap_or_else(|| panic!("unknown profile: {}", profile));
+
+        let (_, http_method, api_path) = FIXTURE_ROUTES
+            .iter()
+            .find(|(n, _, _)| *n == name)
+            .unwrap_or_else(|| panic!("unknown fixture: {}", name));
+
+        let fixture_path = fixtures_dir().join(format!("{}.json", name));
+        let body = std::fs::read_to_string(&fixture_path)
+            .unwrap_or_else(|_| panic!("failed to read fixture: {}", fixture_path.display()));
+
+        Mock::given(method(*http_method))
+            .and(path(*api_path))
+            .respond_with(ResponseTemplate::new(200).set_body_raw(body, "application/json"))
+            .mount(server)
+            .await;
+    }
+
+    /// Mount standard cluster fixtures on a profile (settings, version, nodes, fs, activity).
+    pub async fn mount_cluster_fixtures(&self, profile: &str) {
+        for fixture in &[
+            "cluster_settings",
+            "version",
+            "cluster_nodes",
+            "filesystem",
+            "analytics_activity",
+        ] {
+            self.mount_fixture(profile, fixture).await;
+        }
+    }
+
+    /// Build a command that does NOT set QONTROL_BASE_URL (each profile resolves to its own server).
+    #[allow(deprecated)]
+    pub fn command(&self) -> Command {
+        let mut cmd = Command::cargo_bin("qontrol").expect("binary not found");
+        cmd.env("QONTROL_CONFIG_DIR", self.temp_dir.path())
+            .env("QONTROL_CACHE_DIR", self.temp_dir.path().join("cache"));
+        cmd
+    }
+}
+
 fn fixtures_dir() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests")

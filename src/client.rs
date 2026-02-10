@@ -45,8 +45,11 @@ impl QumuloClient {
             .build()
             .context("failed to build HTTP client")?;
 
-        let base_url = std::env::var("QONTROL_BASE_URL")
-            .unwrap_or_else(|_| format!("https://{}:{}", profile.host, profile.port));
+        let base_url = profile
+            .base_url
+            .clone()
+            .or_else(|| std::env::var("QONTROL_BASE_URL").ok())
+            .unwrap_or_else(|| format!("https://{}:{}", profile.host, profile.port));
 
         Ok(Self {
             client,

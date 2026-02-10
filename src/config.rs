@@ -20,6 +20,9 @@ pub struct ProfileEntry {
     pub token: String,
     #[serde(default)]
     pub insecure: bool,
+    /// Override the base URL for this profile (e.g. "http://proxy:8080"). Used by test harness.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub base_url: Option<String>,
 }
 
 /// Returns the config directory: ~/.config/qontrol/ on Linux, %APPDATA%\qontrol\ on Windows.
@@ -99,6 +102,7 @@ mod tests {
                 port: 8000,
                 token: "access-v1:abc123".to_string(),
                 insecure: true,
+                base_url: None,
             },
         );
 
@@ -124,6 +128,7 @@ mod tests {
                 port: 8000,
                 token: "tok".to_string(),
                 insecure: false,
+                base_url: None,
             },
         );
 
@@ -144,6 +149,7 @@ mod tests {
                 port: 8000,
                 token: "tok".to_string(),
                 insecure: false,
+                base_url: None,
             },
         );
 
