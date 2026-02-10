@@ -216,6 +216,7 @@ fn collect_cluster(profile: &str, entry: &ProfileEntry, timeout_secs: u64) -> Cl
     // Fetch optional data — don't fail if these are unavailable
     let capacity = fetch_capacity(&client);
     let activity = fetch_activity(&client);
+    let files = fetch_file_stats(&client);
 
     // Build health status
     let mut issues = Vec::new();
@@ -252,7 +253,7 @@ fn collect_cluster(profile: &str, entry: &ProfileEntry, timeout_secs: u64) -> Cl
         },
         capacity,
         activity,
-        files: FileStats::default(),
+        files,
         health: HealthStatus {
             status: health_level,
             issues,
@@ -293,49 +294,102 @@ fn fetch_capacity(client: &QumuloClient) -> CapacityStatus {
 }
 
 fn fetch_activity(client: &QumuloClient) -> ActivityStatus {
-    match client.get_activity_current() {
-        Ok(activity) => {
-            let entries = activity["entries"].as_array();
-            match entries {
-                Some(entries) if !entries.is_empty() => aggregate_activity(entries),
-                _ => ActivityStatus::default(),
-            }
-        }
-        Err(e) => {
-            tracing::warn!(error = %e, "failed to fetch activity data");
-            ActivityStatus::default()
-        }
-    }
-}
+    let iops_read = fetch_activity_sum(client, "file-iops-read");
+    let iops_write = fetch_activity_sum(client, "file-iops-write");
+    let throughput_read = fetch_activity_sum(client, "file-throughput-read");
+    let throughput_write = fetch_activity_sum(client, "file-throughput-write");
 
-fn aggregate_activity(entries: &[Value]) -> ActivityStatus {
-    let mut iops_read = 0.0_f64;
-    let mut iops_write = 0.0_f64;
-    let mut tp_read = 0.0_f64;
-    let mut tp_write = 0.0_f64;
-    let mut ips = std::collections::HashSet::new();
-
-    for entry in entries {
-        let rate = entry["rate"].as_f64().unwrap_or(0.0);
-        let kind = entry["type"].as_str().unwrap_or("");
-        if let Some(ip) = entry["ip"].as_str() {
-            ips.insert(ip.to_string());
-        }
-        match kind {
-            "file-iops-read" | "metadata-iops-read" => iops_read += rate,
-            "file-iops-write" | "metadata-iops-write" => iops_write += rate,
-            "file-throughput-read" => tp_read += rate,
-            "file-throughput-write" => tp_write += rate,
-            _ => {}
-        }
-    }
+    let is_idle =
+        iops_read == 0.0 && iops_write == 0.0 && throughput_read == 0.0 && throughput_write == 0.0;
 
     ActivityStatus {
         iops_read,
         iops_write,
-        throughput_read: tp_read,
-        throughput_write: tp_write,
-        connections: ips.len(),
+        throughput_read,
+        throughput_write,
+        connections: 0,
+        is_idle,
+    }
+}
+
+/// Fetch a single activity type and sum all entry rates.
+fn fetch_activity_sum(client: &QumuloClient, activity_type: &str) -> f64 {
+    match client.get_activity_by_type(activity_type) {
+        Ok(resp) => resp["entries"]
+            .as_array()
+            .map(|entries| {
+                entries
+                    .iter()
+                    .filter(|e| {
+                        e["type"]
+                            .as_str()
+                            .map(|t| t == activity_type)
+                            .unwrap_or(false)
+                    })
+                    .map(|e| e["rate"].as_f64().unwrap_or(0.0))
+                    .sum()
+            })
+            .unwrap_or(0.0),
+        Err(e) => {
+            tracing::warn!(error = %e, %activity_type, "failed to fetch activity");
+            0.0
+        }
+    }
+}
+
+fn fetch_file_stats(client: &QumuloClient) -> FileStats {
+    let mut stats = FileStats::default();
+
+    // File/directory counts from recursive aggregates
+    match client.get_file_recursive_aggregates("/") {
+        Ok(agg) => {
+            // Response is an array of pages; each page has a "files" array
+            if let Some(pages) = agg.as_array() {
+                for page in pages {
+                    if let Some(files) = page["files"].as_array() {
+                        for entry in files {
+                            stats.total_files += parse_string_u64(&entry["num_files"]);
+                            stats.total_directories += parse_string_u64(&entry["num_directories"]);
+                        }
+                    }
+                }
+            }
+        }
+        Err(e) => {
+            tracing::warn!(error = %e, "failed to fetch recursive aggregates");
+        }
+    }
+
+    // Snapshot count from /v2/snapshots/
+    match client.get_snapshots() {
+        Ok(snap) => {
+            if let Some(entries) = snap["entries"].as_array() {
+                stats.total_snapshots = entries.len() as u64;
+            }
+        }
+        Err(e) => {
+            tracing::warn!(error = %e, "failed to fetch snapshot list");
+        }
+    }
+
+    // Snapshot total capacity from /v1/snapshots/total-used-capacity
+    match client.get_snapshots_total_capacity() {
+        Ok(cap) => {
+            stats.snapshot_bytes = parse_byte_value(&cap["bytes"]);
+        }
+        Err(e) => {
+            tracing::warn!(error = %e, "failed to fetch snapshot total capacity");
+        }
+    }
+
+    stats
+}
+
+fn parse_string_u64(val: &Value) -> u64 {
+    match val {
+        Value::String(s) => s.parse::<u64>().unwrap_or(0),
+        Value::Number(n) => n.as_u64().unwrap_or(0),
+        _ => 0,
     }
 }
 
@@ -345,6 +399,45 @@ fn parse_byte_value(val: &Value) -> u64 {
         Value::Number(n) => n.as_u64().unwrap_or(0),
         _ => 0,
     }
+}
+
+/// Parse a recursive-aggregates API response and sum file/directory counts.
+/// Response is an array of pages, each containing a "files" array.
+#[cfg(test)]
+fn parse_recursive_aggregates(agg: &Value) -> (u64, u64) {
+    let mut total_files = 0u64;
+    let mut total_dirs = 0u64;
+    if let Some(pages) = agg.as_array() {
+        for page in pages {
+            if let Some(files) = page["files"].as_array() {
+                for entry in files {
+                    total_files += parse_string_u64(&entry["num_files"]);
+                    total_dirs += parse_string_u64(&entry["num_directories"]);
+                }
+            }
+        }
+    }
+    (total_files, total_dirs)
+}
+
+/// Sum rates from an activity response, filtering by the expected type.
+#[cfg(test)]
+fn sum_activity_rates(resp: &Value, activity_type: &str) -> f64 {
+    resp["entries"]
+        .as_array()
+        .map(|entries| {
+            entries
+                .iter()
+                .filter(|e| {
+                    e["type"]
+                        .as_str()
+                        .map(|t| t == activity_type)
+                        .unwrap_or(false)
+                })
+                .map(|e| e["rate"].as_f64().unwrap_or(0.0))
+                .sum()
+        })
+        .unwrap_or(0.0)
 }
 
 fn build_aggregates(clusters: &[ClusterStatus]) -> Aggregates {
@@ -367,6 +460,8 @@ fn build_aggregates(clusters: &[ClusterStatus]) -> Aggregates {
     for c in clusters {
         files.total_files += c.files.total_files;
         files.total_directories += c.files.total_directories;
+        files.total_snapshots += c.files.total_snapshots;
+        files.snapshot_bytes += c.files.snapshot_bytes;
     }
 
     Aggregates {
@@ -376,5 +471,245 @@ fn build_aggregates(clusters: &[ClusterStatus]) -> Aggregates {
         online_nodes,
         capacity: cap,
         files,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn test_parse_recursive_aggregates_basic() {
+        let agg = json!([{
+            "files": [
+                { "num_files": "100", "num_directories": "10" },
+                { "num_files": "200", "num_directories": "20" }
+            ]
+        }]);
+        let (files, dirs) = parse_recursive_aggregates(&agg);
+        assert_eq!(files, 300);
+        assert_eq!(dirs, 30);
+    }
+
+    #[test]
+    fn test_parse_recursive_aggregates_empty() {
+        let agg = json!([{ "files": [] }]);
+        let (files, dirs) = parse_recursive_aggregates(&agg);
+        assert_eq!(files, 0);
+        assert_eq!(dirs, 0);
+    }
+
+    #[test]
+    fn test_parse_recursive_aggregates_missing_fields() {
+        let agg = json!([{ "files": [{ "num_files": "50" }] }]);
+        let (files, dirs) = parse_recursive_aggregates(&agg);
+        assert_eq!(files, 50);
+        assert_eq!(dirs, 0);
+    }
+
+    #[test]
+    fn test_parse_recursive_aggregates_large_numbers() {
+        // Petabyte-scale file counts
+        let agg = json!([{
+            "files": [
+                { "num_files": "1807976645", "num_directories": "219679366" }
+            ]
+        }]);
+        let (files, dirs) = parse_recursive_aggregates(&agg);
+        assert_eq!(files, 1_807_976_645);
+        assert_eq!(dirs, 219_679_366);
+    }
+
+    #[test]
+    fn test_parse_recursive_aggregates_numeric_values() {
+        // Handle numeric values (not just strings)
+        let agg = json!([{
+            "files": [
+                { "num_files": 42, "num_directories": 7 }
+            ]
+        }]);
+        let (files, dirs) = parse_recursive_aggregates(&agg);
+        assert_eq!(files, 42);
+        assert_eq!(dirs, 7);
+    }
+
+    #[test]
+    fn test_sum_activity_rates_basic() {
+        let resp = json!({
+            "entries": [
+                { "type": "file-iops-read", "rate": 10.0 },
+                { "type": "file-iops-read", "rate": 5.5 },
+                { "type": "file-iops-write", "rate": 3.0 }
+            ]
+        });
+        let sum = sum_activity_rates(&resp, "file-iops-read");
+        assert!((sum - 15.5).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_sum_activity_rates_filters_by_type() {
+        let resp = json!({
+            "entries": [
+                { "type": "file-iops-read", "rate": 10.0 },
+                { "type": "file-iops-write", "rate": 20.0 },
+                { "type": "file-throughput-read", "rate": 1000.0 }
+            ]
+        });
+        assert!((sum_activity_rates(&resp, "file-iops-read") - 10.0).abs() < 0.001);
+        assert!((sum_activity_rates(&resp, "file-iops-write") - 20.0).abs() < 0.001);
+        assert!((sum_activity_rates(&resp, "file-throughput-read") - 1000.0).abs() < 0.001);
+        assert!((sum_activity_rates(&resp, "file-throughput-write") - 0.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_sum_activity_rates_empty_entries() {
+        let resp = json!({ "entries": [] });
+        assert_eq!(sum_activity_rates(&resp, "file-iops-read"), 0.0);
+    }
+
+    #[test]
+    fn test_sum_activity_rates_missing_entries() {
+        let resp = json!({});
+        assert_eq!(sum_activity_rates(&resp, "file-iops-read"), 0.0);
+    }
+
+    #[test]
+    fn test_idle_detection_all_zeros() {
+        let activity = ActivityStatus {
+            iops_read: 0.0,
+            iops_write: 0.0,
+            throughput_read: 0.0,
+            throughput_write: 0.0,
+            connections: 0,
+            is_idle: true,
+        };
+        assert!(activity.is_idle);
+    }
+
+    #[test]
+    fn test_idle_detection_not_idle() {
+        let activity = ActivityStatus {
+            iops_read: 1.0,
+            iops_write: 0.0,
+            throughput_read: 0.0,
+            throughput_write: 0.0,
+            connections: 0,
+            is_idle: false,
+        };
+        assert!(!activity.is_idle);
+    }
+
+    #[test]
+    fn test_snapshot_count_from_entries() {
+        let snap = json!({
+            "entries": [
+                { "id": 1, "name": "snap1" },
+                { "id": 2, "name": "snap2" },
+                { "id": 3, "name": "snap3" }
+            ]
+        });
+        let count = snap["entries"]
+            .as_array()
+            .map(|e| e.len() as u64)
+            .unwrap_or(0);
+        assert_eq!(count, 3);
+    }
+
+    #[test]
+    fn test_snapshot_count_empty() {
+        let snap = json!({ "entries": [] });
+        let count = snap["entries"]
+            .as_array()
+            .map(|e| e.len() as u64)
+            .unwrap_or(0);
+        assert_eq!(count, 0);
+    }
+
+    #[test]
+    fn test_parse_byte_value_string() {
+        assert_eq!(parse_byte_value(&json!("7755127889920")), 7_755_127_889_920);
+    }
+
+    #[test]
+    fn test_parse_byte_value_number() {
+        assert_eq!(parse_byte_value(&json!(1024)), 1024);
+    }
+
+    #[test]
+    fn test_parse_byte_value_null() {
+        assert_eq!(parse_byte_value(&json!(null)), 0);
+    }
+
+    #[test]
+    fn test_parse_string_u64_large() {
+        // u64 max is 18446744073709551615
+        assert_eq!(parse_string_u64(&json!("18446744073709551615")), u64::MAX);
+    }
+
+    #[test]
+    fn test_build_aggregates_sums_file_stats() {
+        let clusters = vec![
+            ClusterStatus {
+                profile: "a".into(),
+                name: "a".into(),
+                uuid: "".into(),
+                version: "".into(),
+                cluster_type: ClusterType::CnqAws,
+                reachable: true,
+                stale: false,
+                latency_ms: 0,
+                nodes: NodeStatus {
+                    total: 3,
+                    online: 3,
+                },
+                capacity: CapacityStatus::default(),
+                activity: ActivityStatus::default(),
+                files: FileStats {
+                    total_files: 100,
+                    total_directories: 10,
+                    total_snapshots: 5,
+                    snapshot_bytes: 1000,
+                },
+                health: HealthStatus {
+                    status: HealthLevel::Healthy,
+                    issues: vec![],
+                },
+            },
+            ClusterStatus {
+                profile: "b".into(),
+                name: "b".into(),
+                uuid: "".into(),
+                version: "".into(),
+                cluster_type: ClusterType::OnPrem(vec![]),
+                reachable: true,
+                stale: false,
+                latency_ms: 0,
+                nodes: NodeStatus {
+                    total: 5,
+                    online: 5,
+                },
+                capacity: CapacityStatus::default(),
+                activity: ActivityStatus::default(),
+                files: FileStats {
+                    total_files: 200,
+                    total_directories: 20,
+                    total_snapshots: 10,
+                    snapshot_bytes: 2000,
+                },
+                health: HealthStatus {
+                    status: HealthLevel::Healthy,
+                    issues: vec![],
+                },
+            },
+        ];
+        let agg = build_aggregates(&clusters);
+        assert_eq!(agg.files.total_files, 300);
+        assert_eq!(agg.files.total_directories, 30);
+        assert_eq!(agg.files.total_snapshots, 15);
+        assert_eq!(agg.files.snapshot_bytes, 3000);
+        assert_eq!(agg.total_nodes, 8);
+        assert_eq!(agg.online_nodes, 8);
+        assert_eq!(agg.reachable_count, 2);
     }
 }
