@@ -2,6 +2,7 @@ pub mod cache;
 pub mod capacity;
 pub mod collector;
 pub mod detection;
+pub mod health;
 pub mod types;
 
 use std::thread;

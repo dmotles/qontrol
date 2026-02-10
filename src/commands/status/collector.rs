@@ -9,6 +9,7 @@ use crate::config::{Config, ProfileEntry};
 use super::cache;
 use super::capacity;
 use super::detection::detect_cluster_type;
+use super::health;
 use super::types::*;
 
 /// Per-node NIC stats: (throughput_bps, link_speed_bps, utilization_pct)
@@ -68,7 +69,7 @@ pub fn collect_all(
 
     // Process results: successes go into clusters, failures try cache fallback
     let mut clusters = Vec::new();
-    let mut alerts = Vec::new();
+    let mut connectivity_alerts = Vec::new();
 
     for result in results {
         match result {
@@ -92,7 +93,7 @@ pub fn collect_all(
                         let mut data = cached.data;
                         data.stale = true;
                         data.reachable = false;
-                        alerts.push(Alert {
+                        connectivity_alerts.push(Alert {
                             severity: AlertSeverity::Warning,
                             cluster: profile.clone(),
                             message: format!(
@@ -103,7 +104,7 @@ pub fn collect_all(
                         });
                         clusters.push(data);
                     } else {
-                        alerts.push(Alert {
+                        connectivity_alerts.push(Alert {
                             severity: AlertSeverity::Critical,
                             cluster: profile.clone(),
                             message: format!("unreachable and no cache: {}", error),
@@ -111,7 +112,7 @@ pub fn collect_all(
                         });
                     }
                 } else {
-                    alerts.push(Alert {
+                    connectivity_alerts.push(Alert {
                         severity: AlertSeverity::Critical,
                         cluster: profile.clone(),
                         message: format!("unreachable: {}", error),
@@ -125,76 +126,8 @@ pub fn collect_all(
     // Build aggregates
     let aggregates = build_aggregates(&clusters);
 
-    // Add health alerts from per-cluster data
-    for cluster in &clusters {
-        if cluster.nodes.online < cluster.nodes.total {
-            let offline = cluster.nodes.total - cluster.nodes.online;
-            alerts.push(Alert {
-                severity: AlertSeverity::Critical,
-                cluster: cluster.name.clone(),
-                message: format!("{} node(s) offline", offline),
-                category: "node_offline".to_string(),
-            });
-        }
-        if cluster.health.disks_unhealthy > 0 {
-            alerts.push(Alert {
-                severity: AlertSeverity::Warning,
-                cluster: cluster.name.clone(),
-                message: format!("{} disk(s) unhealthy", cluster.health.disks_unhealthy),
-                category: "disk_unhealthy".to_string(),
-            });
-        }
-        if cluster.health.psus_unhealthy > 0 {
-            alerts.push(Alert {
-                severity: AlertSeverity::Warning,
-                cluster: cluster.name.clone(),
-                message: format!("{} PSU(s) unhealthy", cluster.health.psus_unhealthy),
-                category: "psu_unhealthy".to_string(),
-            });
-        }
-        if cluster.health.data_at_risk {
-            alerts.push(Alert {
-                severity: AlertSeverity::Critical,
-                cluster: cluster.name.clone(),
-                message: "DATA AT RISK — restriper active".to_string(),
-                category: "data_at_risk".to_string(),
-            });
-        }
-        if let Some(remaining) = cluster.health.remaining_node_failures {
-            if remaining == 0 {
-                alerts.push(Alert {
-                    severity: AlertSeverity::Warning,
-                    cluster: cluster.name.clone(),
-                    message: "fault tolerance degraded (0 node failures remaining)".to_string(),
-                    category: "protection_degraded".to_string(),
-                });
-            }
-        }
-        if let Some(remaining) = cluster.health.remaining_drive_failures {
-            if remaining == 0 {
-                alerts.push(Alert {
-                    severity: AlertSeverity::Warning,
-                    cluster: cluster.name.clone(),
-                    message: "fault tolerance degraded (0 drive failures remaining)".to_string(),
-                    category: "protection_degraded".to_string(),
-                });
-            }
-        }
-    }
-
-    // Add capacity projection alerts
-    for cluster in &clusters {
-        if let Some(ref projection) = cluster.capacity.projection {
-            if capacity::should_warn(projection, &cluster.cluster_type) {
-                alerts.push(Alert {
-                    severity: AlertSeverity::Warning,
-                    cluster: cluster.name.clone(),
-                    message: capacity::format_warning(projection, &cluster.cluster_type),
-                    category: "capacity_projection".to_string(),
-                });
-            }
-        }
-    }
+    // Generate prioritized, sorted alerts via the alerts engine
+    let alerts = health::generate_alerts(&clusters, connectivity_alerts);
 
     Ok(EnvironmentStatus {
         aggregates,
@@ -262,6 +195,18 @@ fn collect_cluster(profile: &str, entry: &ProfileEntry, timeout_secs: u64) -> Cl
                 .unwrap_or(false)
         })
         .count();
+
+    // Collect offline node IDs
+    let offline_nodes: Vec<u64> = nodes_array
+        .iter()
+        .filter(|n| {
+            n["node_status"]
+                .as_str()
+                .map(|s| !s.eq_ignore_ascii_case("online"))
+                .unwrap_or(true)
+        })
+        .filter_map(|n| n["id"].as_u64())
+        .collect();
 
     let cluster_type = detect_cluster_type(nodes_array);
 
@@ -358,6 +303,7 @@ fn collect_cluster(profile: &str, entry: &ProfileEntry, timeout_secs: u64) -> Cl
         nodes: NodeStatus {
             total: total_nodes,
             online: online_nodes,
+            offline_nodes,
             details: node_details,
         },
         capacity,
@@ -372,6 +318,8 @@ fn collect_cluster(profile: &str, entry: &ProfileEntry, timeout_secs: u64) -> Cl
             remaining_node_failures,
             remaining_drive_failures,
             protection_type,
+            unhealthy_disk_details: disk_details,
+            unhealthy_psu_details: psu_details,
         },
     };
 
@@ -1596,6 +1544,7 @@ mod tests {
                 nodes: NodeStatus {
                     total: 3,
                     online: 3,
+                    offline_nodes: vec![],
                     details: vec![],
                 },
                 capacity: CapacityStatus::default(),
@@ -1615,6 +1564,8 @@ mod tests {
                     remaining_node_failures: None,
                     remaining_drive_failures: None,
                     protection_type: None,
+                    unhealthy_disk_details: vec![],
+                    unhealthy_psu_details: vec![],
                 },
             },
             ClusterStatus {
@@ -1629,6 +1580,7 @@ mod tests {
                 nodes: NodeStatus {
                     total: 5,
                     online: 5,
+                    offline_nodes: vec![],
                     details: vec![],
                 },
                 capacity: CapacityStatus::default(),
@@ -1648,6 +1600,8 @@ mod tests {
                     remaining_node_failures: None,
                     remaining_drive_failures: None,
                     protection_type: None,
+                    unhealthy_disk_details: vec![],
+                    unhealthy_psu_details: vec![],
                 },
             },
         ];

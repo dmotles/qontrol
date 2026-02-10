@@ -85,6 +85,7 @@ mod tests {
             nodes: NodeStatus {
                 total: 1,
                 online: 1,
+                offline_nodes: vec![],
                 details: vec![],
             },
             capacity: CapacityStatus::default(),
@@ -99,6 +100,8 @@ mod tests {
                 remaining_node_failures: None,
                 remaining_drive_failures: None,
                 protection_type: None,
+                unhealthy_disk_details: vec![],
+                unhealthy_psu_details: vec![],
             },
         }
     }

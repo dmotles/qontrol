@@ -63,6 +63,8 @@ pub struct ClusterStatus {
 pub struct NodeStatus {
     pub total: usize,
     pub online: usize,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub offline_nodes: Vec<u64>,
     #[serde(default)]
     pub details: Vec<NodeNetworkInfo>,
 }
@@ -147,6 +149,10 @@ pub struct HealthStatus {
     pub remaining_drive_failures: Option<u64>,
     #[serde(default)]
     pub protection_type: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub unhealthy_disk_details: Vec<UnhealthyDisk>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub unhealthy_psu_details: Vec<UnhealthyPsu>,
 }
 
 /// Details of an unhealthy disk.
@@ -271,6 +277,7 @@ mod tests {
             nodes: NodeStatus {
                 total: 4,
                 online: 4,
+                offline_nodes: vec![],
                 details: vec![],
             },
             capacity: CapacityStatus {
@@ -292,6 +299,8 @@ mod tests {
                 remaining_node_failures: Some(1),
                 remaining_drive_failures: Some(2),
                 protection_type: Some("PROTECTION_SYSTEM_TYPE_EC".to_string()),
+                unhealthy_disk_details: vec![],
+                unhealthy_psu_details: vec![],
             },
         };
 
@@ -388,6 +397,7 @@ mod tests {
                 nodes: NodeStatus {
                     total: 1,
                     online: 1,
+                    offline_nodes: vec![],
                     details: vec![],
                 },
                 capacity: CapacityStatus::default(),
@@ -402,6 +412,8 @@ mod tests {
                     remaining_node_failures: None,
                     remaining_drive_failures: None,
                     protection_type: None,
+                    unhealthy_disk_details: vec![],
+                    unhealthy_psu_details: vec![],
                 },
             }),
             latency_ms: 10,
