@@ -1,0 +1,434 @@
+{
+  "entries": [
+    {
+      "created_by_policy": false,
+      "directory_name": "677_replication_from_aws-gravytrain",
+      "expiration": "",
+      "id": 677,
+      "in_delete": false,
+      "name": "replication_from_aws-gravytrain",
+      "source_file_id": "90823937415894215410747179010",
+      "timestamp": "2025-01-15T18:53:09.606862774Z"
+    },
+    {
+      "created_by_policy": false,
+      "directory_name": "678_replication_from_gravytrain-sg",
+      "expiration": "",
+      "id": 678,
+      "in_delete": false,
+      "name": "replication_from_gravytrain-sg",
+      "source_file_id": "90823937415894215410747179016",
+      "timestamp": "2025-01-15T19:35:43.043974925Z"
+    },
+    {
+      "created_by_policy": false,
+      "directory_name": "684_replication_from_gravytrain-east",
+      "expiration": "",
+      "id": 684,
+      "in_delete": false,
+      "name": "replication_from_gravytrain-east",
+      "source_file_id": "90823937415894215410749289013",
+      "timestamp": "2025-02-01T01:00:22.904030716Z"
+    },
+    {
+      "created_by_policy": false,
+      "directory_name": "685_replication_from_gravytrain-sg",
+      "expiration": "",
+      "id": 685,
+      "in_delete": false,
+      "name": "replication_from_gravytrain-sg",
+      "source_file_id": "90823937415894215410749269015",
+      "timestamp": "2025-02-01T01:17:10.508058162Z"
+    },
+    {
+      "created_by_policy": false,
+      "directory_name": "686_replication_from_gravytrain-sg",
+      "expiration": "",
+      "id": 686,
+      "in_delete": false,
+      "name": "replication_from_gravytrain-sg",
+      "source_file_id": "90823937415894215410749259011",
+      "timestamp": "2025-02-01T01:17:50.731668191Z"
+    },
+    {
+      "created_by_policy": false,
+      "directory_name": "687_replication_from_gravytrain-sg",
+      "expiration": "",
+      "id": 687,
+      "in_delete": false,
+      "name": "replication_from_gravytrain-sg",
+      "source_file_id": "90823937415894215410749269013",
+      "timestamp": "2025-02-01T01:17:10.504198802Z"
+    },
+    {
+      "created_by_policy": false,
+      "directory_name": "688_replication_from_iss-sg",
+      "expiration": "",
+      "id": 688,
+      "in_delete": false,
+      "name": "replication_from_iss-sg",
+      "source_file_id": "90823937415894215410749219014",
+      "timestamp": "2025-02-01T01:17:12.871888039Z"
+    },
+    {
+      "created_by_policy": false,
+      "directory_name": "689_replication_from_gravytrain-sg",
+      "expiration": "",
+      "id": 689,
+      "in_delete": false,
+      "name": "replication_from_gravytrain-sg",
+      "source_file_id": "90823937415894215410749259012",
+      "timestamp": "2025-02-01T01:17:50.840883767Z"
+    },
+    {
+      "created_by_policy": false,
+      "directory_name": "690_replication_from_gravytrain-sg",
+      "expiration": "",
+      "id": 690,
+      "in_delete": false,
+      "name": "replication_from_gravytrain-sg",
+      "source_file_id": "90823937415894215410749259013",
+      "timestamp": "2025-02-01T01:17:10.485100906Z"
+    },
+    {
+      "created_by_policy": false,
+      "directory_name": "691_replication_from_gravytrain-sg",
+      "expiration": "",
+      "id": 691,
+      "in_delete": false,
+      "name": "replication_from_gravytrain-sg",
+      "source_file_id": "90823937415894215410749269014",
+      "timestamp": "2025-02-01T01:17:10.521963792Z"
+    },
+    {
+      "created_by_policy": false,
+      "directory_name": "692_replication_from_gravytrain-sg",
+      "expiration": "",
+      "id": 692,
+      "in_delete": false,
+      "name": "replication_from_gravytrain-sg",
+      "source_file_id": "90823937415894215410749269012",
+      "timestamp": "2025-02-01T01:17:51.263764511Z"
+    },
+    {
+      "created_by_policy": false,
+      "directory_name": "693_replication_from_gravytrain-sg",
+      "expiration": "",
+      "id": 693,
+      "in_delete": false,
+      "name": "replication_from_gravytrain-sg",
+      "source_file_id": "90823937415894215410749269011",
+      "timestamp": "2025-02-01T01:17:10.513840212Z"
+    },
+    {
+      "created_by_policy": false,
+      "directory_name": "694_replication_from_iss-sg",
+      "expiration": "",
+      "id": 694,
+      "in_delete": false,
+      "name": "replication_from_iss-sg",
+      "source_file_id": "90823937415894215410749219012",
+      "timestamp": "2025-02-01T03:07:24.358850643Z"
+    },
+    {
+      "created_by_policy": false,
+      "directory_name": "695_replication_from_gravytrain-sg",
+      "expiration": "",
+      "id": 695,
+      "in_delete": false,
+      "name": "replication_from_gravytrain-sg",
+      "source_file_id": "90823937415894215410749279011",
+      "timestamp": "2025-02-01T04:46:19.2077362Z"
+    },
+    {
+      "created_by_policy": false,
+      "directory_name": "696_replication_from_iss-sg",
+      "expiration": "",
+      "id": 696,
+      "in_delete": false,
+      "name": "replication_from_iss-sg",
+      "source_file_id": "90823937415894215410749219013",
+      "timestamp": "2025-02-01T04:46:24.346274439Z"
+    },
+    {
+      "created_by_policy": false,
+      "directory_name": "697_replication_from_iss-sg",
+      "expiration": "",
+      "id": 697,
+      "in_delete": false,
+      "name": "replication_from_iss-sg",
+      "source_file_id": "90823937415894215410749309011",
+      "timestamp": "2025-02-01T04:46:24.365104913Z"
+    },
+    {
+      "created_by_policy": false,
+      "directory_name": "717_replication_from_gravytrain-east",
+      "expiration": "",
+      "id": 717,
+      "in_delete": false,
+      "name": "replication_from_gravytrain-east",
+      "source_file_id": "90823937415894215410760339012",
+      "timestamp": "2025-03-07T01:26:45.968111673Z"
+    },
+    {
+      "created_by_policy": false,
+      "directory_name": "718_replication_from_gravytrain-sg",
+      "expiration": "",
+      "id": 718,
+      "in_delete": false,
+      "name": "replication_from_gravytrain-sg",
+      "source_file_id": "90823937415894215410760329011",
+      "timestamp": "2025-03-07T01:26:43.196121228Z"
+    },
+    {
+      "created_by_policy": false,
+      "directory_name": "719_replication_from_gravytrain-sg",
+      "expiration": "",
+      "id": 719,
+      "in_delete": false,
+      "name": "replication_from_gravytrain-sg",
+      "source_file_id": "90823937415894215410760179013",
+      "timestamp": "2025-03-07T01:26:42.829163721Z"
+    },
+    {
+      "created_by_policy": false,
+      "directory_name": "720_replication_from_iss-sg",
+      "expiration": "",
+      "id": 720,
+      "in_delete": false,
+      "name": "replication_from_iss-sg",
+      "source_file_id": "90823937415894215410760249012",
+      "timestamp": "2025-03-07T01:26:49.917653281Z"
+    },
+    {
+      "created_by_policy": false,
+      "directory_name": "721_replication_from_gravytrain-sg",
+      "expiration": "",
+      "id": 721,
+      "in_delete": false,
+      "name": "replication_from_gravytrain-sg",
+      "source_file_id": "90823937415894215410760209014",
+      "timestamp": "2025-03-07T01:26:42.985092921Z"
+    },
+    {
+      "created_by_policy": false,
+      "directory_name": "722_replication_from_iss-sg",
+      "expiration": "",
+      "id": 722,
+      "in_delete": false,
+      "name": "replication_from_iss-sg",
+      "source_file_id": "90823937415894215410760319014",
+      "timestamp": "2025-03-07T01:26:49.846206669Z"
+    },
+    {
+      "created_by_policy": false,
+      "directory_name": "723_replication_from_gravytrain-east",
+      "expiration": "",
+      "id": 723,
+      "in_delete": false,
+      "name": "replication_from_gravytrain-east",
+      "source_file_id": "90823937415894215410761498192",
+      "timestamp": "2025-03-07T23:54:16.086516863Z"
+    },
+    {
+      "created_by_policy": false,
+      "directory_name": "724_replication_from_gravytrain-sg",
+      "expiration": "",
+      "id": 724,
+      "in_delete": false,
+      "name": "replication_from_gravytrain-sg",
+      "source_file_id": "90823937415894215410761716756",
+      "timestamp": "2025-03-07T23:54:15.814518451Z"
+    },
+    {
+      "created_by_policy": false,
+      "directory_name": "725_replication_from_gravytrain-sg",
+      "expiration": "",
+      "id": 725,
+      "in_delete": false,
+      "name": "replication_from_gravytrain-sg",
+      "source_file_id": "90823937415894215410761616295",
+      "timestamp": "2025-03-07T23:54:16.291239729Z"
+    },
+    {
+      "created_by_policy": false,
+      "directory_name": "726_replication_from_iss-sg",
+      "expiration": "",
+      "id": 726,
+      "in_delete": false,
+      "name": "replication_from_iss-sg",
+      "source_file_id": "90823937415894215410761498191",
+      "timestamp": "2025-03-07T23:54:14.509292841Z"
+    },
+    {
+      "created_by_policy": false,
+      "directory_name": "727_replication_from_gravytrain-sg",
+      "expiration": "",
+      "id": 727,
+      "in_delete": false,
+      "name": "replication_from_gravytrain-sg",
+      "source_file_id": "90823937415894215410762039400",
+      "timestamp": "2025-03-07T23:54:16.218419539Z"
+    },
+    {
+      "created_by_policy": false,
+      "directory_name": "728_replication_from_iss-sg",
+      "expiration": "",
+      "id": 728,
+      "in_delete": false,
+      "name": "replication_from_iss-sg",
+      "source_file_id": "90823937415894215410761478184",
+      "timestamp": "2025-03-07T23:54:14.417542864Z"
+    },
+    {
+      "created_by_policy": false,
+      "directory_name": "734_replication_from_gravytrain-east",
+      "expiration": "",
+      "id": 734,
+      "in_delete": false,
+      "name": "replication_from_gravytrain-east",
+      "source_file_id": "90823937415894215410764319011",
+      "timestamp": "2025-03-13T02:25:31.246437421Z"
+    },
+    {
+      "created_by_policy": false,
+      "directory_name": "735_replication_from_gravytrain-sg",
+      "expiration": "",
+      "id": 735,
+      "in_delete": false,
+      "name": "replication_from_gravytrain-sg",
+      "source_file_id": "90823937415894215410764249011",
+      "timestamp": "2025-03-13T02:25:31.855611182Z"
+    },
+    {
+      "created_by_policy": false,
+      "directory_name": "736_replication_from_gravytrain-sg",
+      "expiration": "",
+      "id": 736,
+      "in_delete": false,
+      "name": "replication_from_gravytrain-sg",
+      "source_file_id": "90823937415894215410764239011",
+      "timestamp": "2025-03-13T02:25:31.553819605Z"
+    },
+    {
+      "created_by_policy": false,
+      "directory_name": "737_replication_from_iss-sg",
+      "expiration": "",
+      "id": 737,
+      "in_delete": false,
+      "name": "replication_from_iss-sg",
+      "source_file_id": "90823937415894215410764279011",
+      "timestamp": "2025-03-13T02:25:29.983560151Z"
+    },
+    {
+      "created_by_policy": false,
+      "directory_name": "738_replication_from_iss-sg",
+      "expiration": "",
+      "id": 738,
+      "in_delete": false,
+      "name": "replication_from_iss-sg",
+      "source_file_id": "90823937415894215410764189016",
+      "timestamp": "2025-03-13T02:25:29.877845669Z"
+    },
+    {
+      "created_by_policy": false,
+      "directory_name": "739_replication_from_gravytrain-sg",
+      "expiration": "",
+      "id": 739,
+      "in_delete": false,
+      "name": "replication_from_gravytrain-sg",
+      "source_file_id": "90823937415894215410764179012",
+      "timestamp": "2025-03-13T02:25:31.650743895Z"
+    },
+    {
+      "created_by_policy": false,
+      "directory_name": "740_replication_from_gravytrain-east",
+      "expiration": "",
+      "id": 740,
+      "in_delete": false,
+      "name": "replication_from_gravytrain-east",
+      "source_file_id": "90823937415894215410765307387",
+      "timestamp": "2025-03-13T16:22:28.909189223Z"
+    },
+    {
+      "created_by_policy": false,
+      "directory_name": "741_replication_from_gravytrain-sg",
+      "expiration": "",
+      "id": 741,
+      "in_delete": false,
+      "name": "replication_from_gravytrain-sg",
+      "source_file_id": "90823937415894215410765841174",
+      "timestamp": "2025-03-13T16:22:28.261961078Z"
+    },
+    {
+      "created_by_policy": false,
+      "directory_name": "747_replication_from_iss-sg",
+      "expiration": "",
+      "id": 747,
+      "in_delete": false,
+      "name": "replication_from_iss-sg",
+      "source_file_id": "90823937415894215410765635630",
+      "timestamp": "2025-03-13T22:43:32.523339985Z"
+    },
+    {
+      "created_by_policy": false,
+      "directory_name": "751_replication_from_gravytrain-sg",
+      "expiration": "",
+      "id": 751,
+      "in_delete": false,
+      "name": "replication_from_gravytrain-sg",
+      "source_file_id": "90823937415894215410765753547",
+      "timestamp": "2025-03-15T01:18:52.196462551Z"
+    },
+    {
+      "created_by_policy": false,
+      "directory_name": "753_replication_from_gravytrain-sg",
+      "expiration": "",
+      "id": 753,
+      "in_delete": false,
+      "name": "replication_from_gravytrain-sg",
+      "source_file_id": "90823937415894215410765327768",
+      "timestamp": "2025-03-15T05:16:20.06145996Z"
+    },
+    {
+      "created_by_policy": false,
+      "directory_name": "838_replication_from_iss-sg",
+      "expiration": "",
+      "id": 838,
+      "in_delete": false,
+      "name": "replication_from_iss-sg",
+      "source_file_id": "90823937415894215410765939353",
+      "timestamp": "2025-07-28T22:36:12.333775689Z"
+    },
+    {
+      "created_by_policy": false,
+      "directory_name": "984_replication_from_iss-sg",
+      "expiration": "",
+      "id": 984,
+      "in_delete": false,
+      "name": "replication_from_iss-sg",
+      "source_file_id": "90823937415894215410835320202",
+      "timestamp": "2026-01-19T20:58:45.839029092Z"
+    },
+    {
+      "created_by_policy": false,
+      "directory_name": "988_replication_from_iss-sg",
+      "expiration": "",
+      "id": 988,
+      "in_delete": false,
+      "name": "replication_from_iss-sg",
+      "source_file_id": "90823937415894215410836386027",
+      "timestamp": "2026-01-20T07:59:39.260199316Z"
+    },
+    {
+      "created_by_policy": false,
+      "directory_name": "1002_replication_from_gravytrain-sg",
+      "expiration": "",
+      "id": 1002,
+      "in_delete": false,
+      "name": "replication_from_gravytrain-sg",
+      "source_file_id": "90823937415894215410747179015",
+      "timestamp": "2026-02-09T20:08:27.306804597Z"
+    }
+  ]
+}

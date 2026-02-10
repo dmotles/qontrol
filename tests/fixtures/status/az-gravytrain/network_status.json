@@ -1,0 +1,777 @@
+[
+  {
+    "cloud_status": {
+      "azure_status": {
+        "network": "38.103.129.0",
+        "private_ipv4_address": "38.103.129.16",
+        "subnet_mask": "255.255.255.0"
+      },
+      "type": "AZURE"
+    },
+    "devices": [
+      {
+        "bonding_mode": "ACTIVE_BACKUP",
+        "bytes_received": "332019615740",
+        "bytes_sent": "224754997121",
+        "cable_status": "CONNECTED",
+        "interface_status": "UP",
+        "mac_address": "60:45:bd:56:52:c2",
+        "mtu": 1400,
+        "name": "bond0",
+        "network_details": {
+          "host_routable_ip_addresses": [],
+          "qumulo_ip_addresses": [
+            {
+              "address": "10.91.253.248",
+              "assigned_by": "DHCP",
+              "floating_addresses": [
+                "10.91.253.18",
+                "10.91.253.21",
+                "10.91.253.24",
+                "10.91.253.27",
+                "10.91.253.30",
+                "10.91.253.33",
+                "10.91.253.36",
+                "10.91.253.39",
+                "10.91.253.42",
+                "10.91.253.45",
+                "10.91.253.48",
+                "10.91.253.51",
+                "10.91.253.54",
+                "10.91.253.57",
+                "10.91.253.60",
+                "10.91.253.63",
+                "10.91.253.66",
+                "10.91.253.69",
+                "10.91.253.72",
+                "10.91.253.75",
+                "10.91.253.78",
+                "10.91.253.81",
+                "10.91.253.84",
+                "10.91.253.87",
+                "10.91.253.90",
+                "10.91.253.93",
+                "10.91.253.96",
+                "10.91.253.99",
+                "10.91.253.102",
+                "10.91.253.105",
+                "10.91.253.108",
+                "10.91.253.111",
+                "10.91.253.114",
+                "10.91.253.117",
+                "10.91.253.120",
+                "10.91.253.123",
+                "10.91.253.126",
+                "10.91.253.129",
+                "10.91.253.132",
+                "10.91.253.135",
+                "10.91.253.138",
+                "10.91.253.141",
+                "10.91.253.144",
+                "10.91.253.147",
+                "10.91.253.150",
+                "10.91.253.153",
+                "10.91.253.156",
+                "10.91.253.159",
+                "10.91.253.162",
+                "10.91.253.165",
+                "10.91.253.168",
+                "10.91.253.171",
+                "10.91.253.174"
+              ],
+              "gateway": null,
+              "netmask": "255.255.255.0",
+              "network_id": 1
+            }
+          ],
+          "use_for": "FRONTEND"
+        },
+        "permanent_mac_address": null,
+        "speed": null,
+        "timestamp": "1770755203828",
+        "vlan_id": null
+      },
+      {
+        "bonding_mode": "ACTIVE_BACKUP",
+        "bytes_received": "12867021222155",
+        "bytes_sent": "12219591069368",
+        "cable_status": "CONNECTED",
+        "interface_status": "UP",
+        "mac_address": "60:45:bd:56:5f:d8",
+        "mtu": 1400,
+        "name": "bond1",
+        "network_details": {
+          "host_routable_ip_addresses": [],
+          "qumulo_ip_addresses": [
+            {
+              "address": "38.103.129.16",
+              "assigned_by": "DHCP",
+              "floating_addresses": [],
+              "gateway": null,
+              "netmask": "255.255.255.0",
+              "network_id": 2
+            }
+          ],
+          "use_for": "BACKEND"
+        },
+        "permanent_mac_address": null,
+        "speed": null,
+        "timestamp": "1770755203828",
+        "vlan_id": null
+      },
+      {
+        "bonding_mode": null,
+        "bytes_received": "12867021222155",
+        "bytes_sent": "12219591069368",
+        "cable_status": "CONNECTED",
+        "interface_status": "UP",
+        "mac_address": "60:45:bd:56:5f:d8",
+        "mtu": 1400,
+        "name": "eth0",
+        "network_details": {
+          "upper_interface_name": "bond1",
+          "use_for": "UNDERLYING"
+        },
+        "permanent_mac_address": "60:45:bd:56:5f:d8",
+        "speed": "50000",
+        "timestamp": "1770755203828",
+        "vlan_id": null
+      },
+      {
+        "bonding_mode": null,
+        "bytes_received": "332019615740",
+        "bytes_sent": "224754997121",
+        "cable_status": "CONNECTED",
+        "interface_status": "UP",
+        "mac_address": "60:45:bd:56:52:c2",
+        "mtu": 1400,
+        "name": "eth1",
+        "network_details": {
+          "upper_interface_name": "bond0",
+          "use_for": "UNDERLYING"
+        },
+        "permanent_mac_address": "60:45:bd:56:52:c2",
+        "speed": "50000",
+        "timestamp": "1770755203828",
+        "vlan_id": null
+      },
+      {
+        "bonding_mode": null,
+        "bytes_received": "2850703055",
+        "bytes_sent": "3249014310",
+        "cable_status": "CONNECTED",
+        "interface_status": "UP",
+        "mac_address": "60:45:bd:56:52:c2",
+        "mtu": 1400,
+        "name": "eth2",
+        "network_details": {
+          "addresses": [],
+          "use_for": "NONE"
+        },
+        "permanent_mac_address": "60:45:bd:56:52:c2",
+        "speed": "50000",
+        "timestamp": "1770755203828",
+        "vlan_id": null
+      },
+      {
+        "bonding_mode": null,
+        "bytes_received": "389435966519",
+        "bytes_sent": "1818510980513",
+        "cable_status": "CONNECTED",
+        "interface_status": "UP",
+        "mac_address": "60:45:bd:56:5f:d8",
+        "mtu": 1400,
+        "name": "eth3",
+        "network_details": {
+          "addresses": [],
+          "use_for": "NONE"
+        },
+        "permanent_mac_address": "60:45:bd:56:5f:d8",
+        "speed": "50000",
+        "timestamp": "1770755203828",
+        "vlan_id": null
+      },
+      {
+        "bonding_mode": null,
+        "bytes_received": "1408186545877",
+        "bytes_sent": "1408186545877",
+        "cable_status": "CONNECTED",
+        "interface_status": "UNKNOWN",
+        "mac_address": "00:00:00:00:00:00",
+        "mtu": 65536,
+        "name": "lo",
+        "network_details": {
+          "addresses": [
+            "127.0.0.1",
+            "::1"
+          ],
+          "use_for": "NONE"
+        },
+        "permanent_mac_address": null,
+        "speed": null,
+        "timestamp": "1770755203828",
+        "vlan_id": null
+      }
+    ],
+    "environment": {
+      "dns_search_domains": [
+        "eng.qumulo.com",
+        "corp.qumulo.com",
+        "zczbxkrnzjhetmwbvp0h4guzze.hx.internal.cloudapp.net",
+        "tyl0yz40qcne3p2lktnwxkn2id.hx.internal.cloudapp.net"
+      ],
+      "dns_servers": [
+        "10.100.0.11",
+        "10.102.0.11",
+        "168.63.129.16"
+      ],
+      "systemwide_default_gateways": [
+        "10.91.253.1",
+        "38.103.129.1"
+      ]
+    },
+    "managed_interface_statuses": [
+      {
+        "details": "",
+        "name": "bond0",
+        "status": "APPLIED"
+      },
+      {
+        "details": "",
+        "name": "bond1",
+        "status": "APPLIED"
+      }
+    ],
+    "network_statuses": {
+      "1": {
+        "details": "",
+        "name": "Default",
+        "status": "APPLIED"
+      },
+      "2": {
+        "details": "",
+        "name": "Default.2",
+        "status": "APPLIED"
+      }
+    },
+    "node_id": 7,
+    "node_name": "gravytrain-east-7"
+  },
+  {
+    "cloud_status": {
+      "azure_status": {
+        "network": "38.103.129.0",
+        "private_ipv4_address": "38.103.129.18",
+        "subnet_mask": "255.255.255.0"
+      },
+      "type": "AZURE"
+    },
+    "devices": [
+      {
+        "bonding_mode": "ACTIVE_BACKUP",
+        "bytes_received": "630874092574",
+        "bytes_sent": "444081558076",
+        "cable_status": "CONNECTED",
+        "interface_status": "UP",
+        "mac_address": "00:22:48:19:c0:f1",
+        "mtu": 1400,
+        "name": "bond0",
+        "network_details": {
+          "host_routable_ip_addresses": [],
+          "qumulo_ip_addresses": [
+            {
+              "address": "10.91.253.246",
+              "assigned_by": "DHCP",
+              "floating_addresses": [
+                "10.91.253.17",
+                "10.91.253.20",
+                "10.91.253.23",
+                "10.91.253.26",
+                "10.91.253.29",
+                "10.91.253.32",
+                "10.91.253.35",
+                "10.91.253.38",
+                "10.91.253.41",
+                "10.91.253.44",
+                "10.91.253.47",
+                "10.91.253.50",
+                "10.91.253.53",
+                "10.91.253.56",
+                "10.91.253.59",
+                "10.91.253.62",
+                "10.91.253.65",
+                "10.91.253.68",
+                "10.91.253.71",
+                "10.91.253.74",
+                "10.91.253.77",
+                "10.91.253.80",
+                "10.91.253.83",
+                "10.91.253.86",
+                "10.91.253.89",
+                "10.91.253.92",
+                "10.91.253.95",
+                "10.91.253.98",
+                "10.91.253.101",
+                "10.91.253.104",
+                "10.91.253.107",
+                "10.91.253.110",
+                "10.91.253.113",
+                "10.91.253.116",
+                "10.91.253.119",
+                "10.91.253.122",
+                "10.91.253.125",
+                "10.91.253.128",
+                "10.91.253.131",
+                "10.91.253.134",
+                "10.91.253.137",
+                "10.91.253.140",
+                "10.91.253.143",
+                "10.91.253.146",
+                "10.91.253.149",
+                "10.91.253.152",
+                "10.91.253.155",
+                "10.91.253.158",
+                "10.91.253.161",
+                "10.91.253.164",
+                "10.91.253.167",
+                "10.91.253.170",
+                "10.91.253.173"
+              ],
+              "gateway": null,
+              "netmask": "255.255.255.0",
+              "network_id": 1
+            }
+          ],
+          "use_for": "FRONTEND"
+        },
+        "permanent_mac_address": null,
+        "speed": null,
+        "timestamp": "1770755203828",
+        "vlan_id": null
+      },
+      {
+        "bonding_mode": "ACTIVE_BACKUP",
+        "bytes_received": "12123008283794",
+        "bytes_sent": "13800180767031",
+        "cable_status": "CONNECTED",
+        "interface_status": "UP",
+        "mac_address": "00:22:48:19:ce:e0",
+        "mtu": 1400,
+        "name": "bond1",
+        "network_details": {
+          "host_routable_ip_addresses": [],
+          "qumulo_ip_addresses": [
+            {
+              "address": "38.103.129.18",
+              "assigned_by": "DHCP",
+              "floating_addresses": [],
+              "gateway": null,
+              "netmask": "255.255.255.0",
+              "network_id": 2
+            }
+          ],
+          "use_for": "BACKEND"
+        },
+        "permanent_mac_address": null,
+        "speed": null,
+        "timestamp": "1770755203828",
+        "vlan_id": null
+      },
+      {
+        "bonding_mode": null,
+        "bytes_received": "12123008283794",
+        "bytes_sent": "13800180767031",
+        "cable_status": "CONNECTED",
+        "interface_status": "UP",
+        "mac_address": "00:22:48:19:ce:e0",
+        "mtu": 1400,
+        "name": "eth0",
+        "network_details": {
+          "upper_interface_name": "bond1",
+          "use_for": "UNDERLYING"
+        },
+        "permanent_mac_address": "00:22:48:19:ce:e0",
+        "speed": "50000",
+        "timestamp": "1770755203828",
+        "vlan_id": null
+      },
+      {
+        "bonding_mode": null,
+        "bytes_received": "630874092574",
+        "bytes_sent": "444081558076",
+        "cable_status": "CONNECTED",
+        "interface_status": "UP",
+        "mac_address": "00:22:48:19:c0:f1",
+        "mtu": 1400,
+        "name": "eth1",
+        "network_details": {
+          "upper_interface_name": "bond0",
+          "use_for": "UNDERLYING"
+        },
+        "permanent_mac_address": "00:22:48:19:c0:f1",
+        "speed": "50000",
+        "timestamp": "1770755203828",
+        "vlan_id": null
+      },
+      {
+        "bonding_mode": null,
+        "bytes_received": "7149186830",
+        "bytes_sent": "8727058429",
+        "cable_status": "CONNECTED",
+        "interface_status": "UP",
+        "mac_address": "00:22:48:19:c0:f1",
+        "mtu": 1400,
+        "name": "eth2",
+        "network_details": {
+          "addresses": [],
+          "use_for": "NONE"
+        },
+        "permanent_mac_address": "00:22:48:19:c0:f1",
+        "speed": "50000",
+        "timestamp": "1770755203828",
+        "vlan_id": null
+      },
+      {
+        "bonding_mode": null,
+        "bytes_received": "445386742800",
+        "bytes_sent": "1976001713544",
+        "cable_status": "CONNECTED",
+        "interface_status": "UP",
+        "mac_address": "00:22:48:19:ce:e0",
+        "mtu": 1400,
+        "name": "eth3",
+        "network_details": {
+          "addresses": [],
+          "use_for": "NONE"
+        },
+        "permanent_mac_address": "00:22:48:19:ce:e0",
+        "speed": "50000",
+        "timestamp": "1770755203828",
+        "vlan_id": null
+      },
+      {
+        "bonding_mode": null,
+        "bytes_received": "1335534188241",
+        "bytes_sent": "1335534188241",
+        "cable_status": "CONNECTED",
+        "interface_status": "UNKNOWN",
+        "mac_address": "00:00:00:00:00:00",
+        "mtu": 65536,
+        "name": "lo",
+        "network_details": {
+          "addresses": [
+            "127.0.0.1",
+            "::1"
+          ],
+          "use_for": "NONE"
+        },
+        "permanent_mac_address": null,
+        "speed": null,
+        "timestamp": "1770755203828",
+        "vlan_id": null
+      }
+    ],
+    "environment": {
+      "dns_search_domains": [
+        "eng.qumulo.com",
+        "corp.qumulo.com",
+        "tyl0yz40qcne3p2lktnwxkn2id.hx.internal.cloudapp.net",
+        "zczbxkrnzjhetmwbvp0h4guzze.hx.internal.cloudapp.net"
+      ],
+      "dns_servers": [
+        "10.100.0.11",
+        "10.102.0.11",
+        "168.63.129.16"
+      ],
+      "systemwide_default_gateways": [
+        "10.91.253.1",
+        "38.103.129.1"
+      ]
+    },
+    "managed_interface_statuses": [
+      {
+        "details": "",
+        "name": "bond0",
+        "status": "APPLIED"
+      },
+      {
+        "details": "",
+        "name": "bond1",
+        "status": "APPLIED"
+      }
+    ],
+    "network_statuses": {
+      "1": {
+        "details": "",
+        "name": "Default",
+        "status": "APPLIED"
+      },
+      "2": {
+        "details": "",
+        "name": "Default.2",
+        "status": "APPLIED"
+      }
+    },
+    "node_id": 6,
+    "node_name": "gravytrain-east-6"
+  },
+  {
+    "cloud_status": {
+      "azure_status": {
+        "network": "38.103.129.0",
+        "private_ipv4_address": "38.103.129.15",
+        "subnet_mask": "255.255.255.0"
+      },
+      "type": "AZURE"
+    },
+    "devices": [
+      {
+        "bonding_mode": "ACTIVE_BACKUP",
+        "bytes_received": "333788419303",
+        "bytes_sent": "335419827602",
+        "cable_status": "CONNECTED",
+        "interface_status": "UP",
+        "mac_address": "00:0d:3a:80:a3:28",
+        "mtu": 1400,
+        "name": "bond0",
+        "network_details": {
+          "host_routable_ip_addresses": [],
+          "qumulo_ip_addresses": [
+            {
+              "address": "10.91.253.245",
+              "assigned_by": "DHCP",
+              "floating_addresses": [
+                "10.91.253.16",
+                "10.91.253.19",
+                "10.91.253.22",
+                "10.91.253.25",
+                "10.91.253.28",
+                "10.91.253.31",
+                "10.91.253.34",
+                "10.91.253.37",
+                "10.91.253.40",
+                "10.91.253.43",
+                "10.91.253.46",
+                "10.91.253.49",
+                "10.91.253.52",
+                "10.91.253.55",
+                "10.91.253.58",
+                "10.91.253.61",
+                "10.91.253.64",
+                "10.91.253.67",
+                "10.91.253.70",
+                "10.91.253.73",
+                "10.91.253.76",
+                "10.91.253.79",
+                "10.91.253.82",
+                "10.91.253.85",
+                "10.91.253.88",
+                "10.91.253.91",
+                "10.91.253.94",
+                "10.91.253.97",
+                "10.91.253.100",
+                "10.91.253.103",
+                "10.91.253.106",
+                "10.91.253.109",
+                "10.91.253.112",
+                "10.91.253.115",
+                "10.91.253.118",
+                "10.91.253.121",
+                "10.91.253.124",
+                "10.91.253.127",
+                "10.91.253.130",
+                "10.91.253.133",
+                "10.91.253.136",
+                "10.91.253.139",
+                "10.91.253.142",
+                "10.91.253.145",
+                "10.91.253.148",
+                "10.91.253.151",
+                "10.91.253.154",
+                "10.91.253.157",
+                "10.91.253.160",
+                "10.91.253.163",
+                "10.91.253.166",
+                "10.91.253.169",
+                "10.91.253.172",
+                "10.91.253.175"
+              ],
+              "gateway": null,
+              "netmask": "255.255.255.0",
+              "network_id": 1
+            }
+          ],
+          "use_for": "FRONTEND"
+        },
+        "permanent_mac_address": null,
+        "speed": null,
+        "timestamp": "1770755203826",
+        "vlan_id": null
+      },
+      {
+        "bonding_mode": "ACTIVE_BACKUP",
+        "bytes_received": "28255468076463",
+        "bytes_sent": "8056932119264",
+        "cable_status": "CONNECTED",
+        "interface_status": "UP",
+        "mac_address": "00:0d:3a:80:a3:50",
+        "mtu": 1400,
+        "name": "bond1",
+        "network_details": {
+          "host_routable_ip_addresses": [],
+          "qumulo_ip_addresses": [
+            {
+              "address": "38.103.129.15",
+              "assigned_by": "DHCP",
+              "floating_addresses": [],
+              "gateway": null,
+              "netmask": "255.255.255.0",
+              "network_id": 2
+            }
+          ],
+          "use_for": "BACKEND"
+        },
+        "permanent_mac_address": null,
+        "speed": null,
+        "timestamp": "1770755203826",
+        "vlan_id": null
+      },
+      {
+        "bonding_mode": null,
+        "bytes_received": "28255468076463",
+        "bytes_sent": "8056932119264",
+        "cable_status": "CONNECTED",
+        "interface_status": "UP",
+        "mac_address": "00:0d:3a:80:a3:50",
+        "mtu": 1400,
+        "name": "eth0",
+        "network_details": {
+          "upper_interface_name": "bond1",
+          "use_for": "UNDERLYING"
+        },
+        "permanent_mac_address": "00:0d:3a:80:a3:50",
+        "speed": "50000",
+        "timestamp": "1770755203826",
+        "vlan_id": null
+      },
+      {
+        "bonding_mode": null,
+        "bytes_received": "333788419303",
+        "bytes_sent": "335419827602",
+        "cable_status": "CONNECTED",
+        "interface_status": "UP",
+        "mac_address": "00:0d:3a:80:a3:28",
+        "mtu": 1400,
+        "name": "eth1",
+        "network_details": {
+          "upper_interface_name": "bond0",
+          "use_for": "UNDERLYING"
+        },
+        "permanent_mac_address": "00:0d:3a:80:a3:28",
+        "speed": "50000",
+        "timestamp": "1770755203826",
+        "vlan_id": null
+      },
+      {
+        "bonding_mode": null,
+        "bytes_received": "959652959889",
+        "bytes_sent": "603539974440",
+        "cable_status": "CONNECTED",
+        "interface_status": "UP",
+        "mac_address": "00:0d:3a:80:a3:50",
+        "mtu": 1400,
+        "name": "eth2",
+        "network_details": {
+          "addresses": [],
+          "use_for": "NONE"
+        },
+        "permanent_mac_address": "00:0d:3a:80:a3:50",
+        "speed": "50000",
+        "timestamp": "1770755203826",
+        "vlan_id": null
+      },
+      {
+        "bonding_mode": null,
+        "bytes_received": "3239628512",
+        "bytes_sent": "2444639346",
+        "cable_status": "CONNECTED",
+        "interface_status": "UP",
+        "mac_address": "00:0d:3a:80:a3:28",
+        "mtu": 1400,
+        "name": "eth3",
+        "network_details": {
+          "addresses": [],
+          "use_for": "NONE"
+        },
+        "permanent_mac_address": "00:0d:3a:80:a3:28",
+        "speed": "50000",
+        "timestamp": "1770755203826",
+        "vlan_id": null
+      },
+      {
+        "bonding_mode": null,
+        "bytes_received": "1379178418892",
+        "bytes_sent": "1379178418892",
+        "cable_status": "CONNECTED",
+        "interface_status": "UNKNOWN",
+        "mac_address": "00:00:00:00:00:00",
+        "mtu": 65536,
+        "name": "lo",
+        "network_details": {
+          "addresses": [
+            "127.0.0.1",
+            "::1"
+          ],
+          "use_for": "NONE"
+        },
+        "permanent_mac_address": null,
+        "speed": null,
+        "timestamp": "1770755203826",
+        "vlan_id": null
+      }
+    ],
+    "environment": {
+      "dns_search_domains": [
+        "eng.qumulo.com",
+        "corp.qumulo.com",
+        "tyl0yz40qcne3p2lktnwxkn2id.hx.internal.cloudapp.net",
+        "zczbxkrnzjhetmwbvp0h4guzze.hx.internal.cloudapp.net"
+      ],
+      "dns_servers": [
+        "10.100.0.11",
+        "10.102.0.11",
+        "168.63.129.16"
+      ],
+      "systemwide_default_gateways": [
+        "10.91.253.1",
+        "38.103.129.1"
+      ]
+    },
+    "managed_interface_statuses": [
+      {
+        "details": "",
+        "name": "bond0",
+        "status": "APPLIED"
+      },
+      {
+        "details": "",
+        "name": "bond1",
+        "status": "APPLIED"
+      }
+    ],
+    "network_statuses": {
+      "1": {
+        "details": "",
+        "name": "Default",
+        "status": "APPLIED"
+      },
+      "2": {
+        "details": "",
+        "name": "Default.2",
+        "status": "APPLIED"
+      }
+    },
+    "node_id": 5,
+    "node_name": "gravytrain-east-5"
+  }
+]

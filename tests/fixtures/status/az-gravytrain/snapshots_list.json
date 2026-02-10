@@ -1,0 +1,54 @@
+{
+  "entries": [
+    {
+      "created_by_policy": false,
+      "directory_name": "193523_replication_from_az-gravytrain-h",
+      "expiration": "",
+      "id": 193523,
+      "in_delete": false,
+      "name": "replication_from_az-gravytrain-h",
+      "source_file_id": "108277887094502708403226279939",
+      "timestamp": "2024-06-26T23:48:58.282240299Z"
+    },
+    {
+      "created_by_policy": false,
+      "directory_name": "193524_replication_from_az-gravytrain-h",
+      "expiration": "",
+      "id": 193524,
+      "in_delete": false,
+      "name": "replication_from_az-gravytrain-h",
+      "source_file_id": "108277887094502708403226289943",
+      "timestamp": "2024-06-27T01:30:01.740995862Z"
+    },
+    {
+      "created_by_policy": false,
+      "directory_name": "204683_replication_from_iss-sg",
+      "expiration": "",
+      "id": 204683,
+      "in_delete": false,
+      "name": "replication_from_iss-sg",
+      "source_file_id": "108277887094502708403228440067",
+      "timestamp": "2024-10-31T00:21:05.153776551Z"
+    },
+    {
+      "created_by_policy": false,
+      "directory_name": "204739_replication_from_iss-sg",
+      "expiration": "",
+      "id": 204739,
+      "in_delete": false,
+      "name": "replication_from_iss-sg",
+      "source_file_id": "108277887094502708403228819978",
+      "timestamp": "2024-11-07T17:11:32.088772578Z"
+    },
+    {
+      "created_by_policy": false,
+      "directory_name": "204744_replication_to_aws-gravytrain",
+      "expiration": "",
+      "id": 204744,
+      "in_delete": false,
+      "name": "replication_to_aws-gravytrain",
+      "source_file_id": "108277887094502708403226459961",
+      "timestamp": "2025-03-13T16:22:28.909189223Z"
+    }
+  ]
+}

@@ -1,0 +1,222 @@
+[
+  {
+    "connections": [
+      {
+        "network_address": "127.0.0.1",
+        "tenant_id": 1,
+        "type": "CONNECTION_TYPE_REST"
+      },
+      {
+        "network_address": "127.0.0.1",
+        "tenant_id": 1,
+        "type": "CONNECTION_TYPE_REST"
+      },
+      {
+        "network_address": "10.120.1.79",
+        "tenant_id": 1,
+        "type": "CONNECTION_TYPE_NFS"
+      },
+      {
+        "network_address": "10.120.1.79",
+        "tenant_id": 1,
+        "type": "CONNECTION_TYPE_NFS"
+      },
+      {
+        "network_address": "10.120.1.79",
+        "tenant_id": 1,
+        "type": "CONNECTION_TYPE_NFS"
+      },
+      {
+        "network_address": "10.120.1.79",
+        "tenant_id": 1,
+        "type": "CONNECTION_TYPE_NFS"
+      },
+      {
+        "network_address": "10.120.1.79",
+        "tenant_id": 1,
+        "type": "CONNECTION_TYPE_NFS"
+      },
+      {
+        "network_address": "10.120.1.79",
+        "tenant_id": 1,
+        "type": "CONNECTION_TYPE_NFS"
+      },
+      {
+        "network_address": "10.120.1.79",
+        "tenant_id": 1,
+        "type": "CONNECTION_TYPE_NFS"
+      },
+      {
+        "network_address": "10.120.1.79",
+        "tenant_id": 1,
+        "type": "CONNECTION_TYPE_NFS"
+      },
+      {
+        "network_address": "10.116.100.149",
+        "tenant_id": 1,
+        "type": "CONNECTION_TYPE_REST"
+      }
+    ],
+    "id": 2
+  },
+  {
+    "connections": [
+      {
+        "network_address": "10.120.248.202",
+        "tenant_id": 1,
+        "type": "CONNECTION_TYPE_REST"
+      },
+      {
+        "network_address": "10.220.150.148",
+        "tenant_id": 1,
+        "type": "CONNECTION_TYPE_NFS"
+      },
+      {
+        "network_address": "10.220.246.62",
+        "tenant_id": 1,
+        "type": "CONNECTION_TYPE_NFS"
+      },
+      {
+        "network_address": "10.220.246.81",
+        "tenant_id": 1,
+        "type": "CONNECTION_TYPE_NFS"
+      },
+      {
+        "network_address": "10.220.14.99",
+        "tenant_id": 1,
+        "type": "CONNECTION_TYPE_REST"
+      },
+      {
+        "network_address": "127.0.0.1",
+        "tenant_id": 1,
+        "type": "CONNECTION_TYPE_REST"
+      },
+      {
+        "network_address": "127.0.0.1",
+        "tenant_id": 1,
+        "type": "CONNECTION_TYPE_REST"
+      }
+    ],
+    "id": 3
+  },
+  {
+    "connections": [
+      {
+        "network_address": "10.220.9.241",
+        "tenant_id": 1,
+        "type": "CONNECTION_TYPE_NFS"
+      },
+      {
+        "network_address": "10.220.246.78",
+        "tenant_id": 1,
+        "type": "CONNECTION_TYPE_NFS"
+      },
+      {
+        "network_address": "10.102.0.72",
+        "tenant_id": 1,
+        "type": "CONNECTION_TYPE_NFS"
+      },
+      {
+        "network_address": "127.0.0.1",
+        "tenant_id": 1,
+        "type": "CONNECTION_TYPE_REST"
+      },
+      {
+        "network_address": "127.0.0.1",
+        "tenant_id": 1,
+        "type": "CONNECTION_TYPE_REST"
+      },
+      {
+        "network_address": "10.116.100.9",
+        "tenant_id": 1,
+        "type": "CONNECTION_TYPE_NFS"
+      },
+      {
+        "network_address": "10.220.1.196",
+        "tenant_id": 1,
+        "type": "CONNECTION_TYPE_REST"
+      }
+    ],
+    "id": 4
+  },
+  {
+    "connections": [
+      {
+        "network_address": "10.220.10.27",
+        "tenant_id": 1,
+        "type": "CONNECTION_TYPE_NFS"
+      },
+      {
+        "network_address": "10.116.10.248",
+        "tenant_id": 1,
+        "type": "CONNECTION_TYPE_NFS"
+      },
+      {
+        "network_address": "10.220.0.84",
+        "tenant_id": 1,
+        "type": "CONNECTION_TYPE_NFS"
+      },
+      {
+        "network_address": "127.0.0.1",
+        "tenant_id": 1,
+        "type": "CONNECTION_TYPE_REST"
+      },
+      {
+        "network_address": "127.0.0.1",
+        "tenant_id": 1,
+        "type": "CONNECTION_TYPE_REST"
+      },
+      {
+        "network_address": "10.116.0.47",
+        "tenant_id": 1,
+        "type": "CONNECTION_TYPE_NFS"
+      },
+      {
+        "network_address": "10.220.0.83",
+        "tenant_id": 1,
+        "type": "CONNECTION_TYPE_NFS"
+      }
+    ],
+    "id": 5
+  },
+  {
+    "connections": [
+      {
+        "network_address": "127.0.0.1",
+        "tenant_id": null,
+        "type": "CONNECTION_TYPE_REST"
+      },
+      {
+        "network_address": "10.220.1.9",
+        "tenant_id": 1,
+        "type": "CONNECTION_TYPE_REST"
+      },
+      {
+        "network_address": "10.220.246.81",
+        "tenant_id": 1,
+        "type": "CONNECTION_TYPE_REST"
+      },
+      {
+        "network_address": "127.0.0.1",
+        "tenant_id": 1,
+        "type": "CONNECTION_TYPE_REST"
+      },
+      {
+        "network_address": "10.116.10.211",
+        "tenant_id": 1,
+        "type": "CONNECTION_TYPE_NFS"
+      },
+      {
+        "network_address": "10.220.246.62",
+        "tenant_id": 1,
+        "type": "CONNECTION_TYPE_NFS"
+      },
+      {
+        "network_address": "10.102.0.72",
+        "tenant_id": 1,
+        "type": "CONNECTION_TYPE_NFS"
+      }
+    ],
+    "id": 6
+  }
+]

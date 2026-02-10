@@ -1,0 +1,11 @@
+{
+  "blocks_per_stripe": 8,
+  "data_blocks_per_stripe": 6,
+  "max_drive_failures": 2,
+  "max_drive_spares": 6,
+  "max_node_failures": 1,
+  "pending_configuration": null,
+  "protection_system_type": "PROTECTION_SYSTEM_TYPE_EC",
+  "remaining_drive_failures": 2,
+  "remaining_node_failures": 1
+}

@@ -1,0 +1,17 @@
+[
+  {
+    "id": 1,
+    "light_visible": false,
+    "psu_statuses": []
+  },
+  {
+    "id": 2,
+    "light_visible": false,
+    "psu_statuses": []
+  },
+  {
+    "id": 3,
+    "light_visible": false,
+    "psu_statuses": []
+  }
+]

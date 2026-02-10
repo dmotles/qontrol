@@ -1,0 +1,11 @@
+{
+  "blocks_per_stripe": 1,
+  "data_blocks_per_stripe": 1,
+  "max_drive_failures": 0,
+  "max_drive_spares": 0,
+  "max_node_failures": 0,
+  "pending_configuration": null,
+  "protection_system_type": "PROTECTION_SYSTEM_TYPE_OBJECT_BACKED",
+  "remaining_drive_failures": 1,
+  "remaining_node_failures": 1
+}

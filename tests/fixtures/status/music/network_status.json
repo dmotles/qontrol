@@ -1,0 +1,287 @@
+[
+  {
+    "cloud_status": null,
+    "devices": [
+      {
+        "bonding_mode": "IEEE_8023AD",
+        "bytes_received": "1565351115344",
+        "bytes_sent": "794640128652",
+        "cable_status": "CONNECTED",
+        "interface_status": "UP",
+        "mac_address": "e4:1d:2d:e4:1d:c0",
+        "mtu": 1500,
+        "name": "bond0",
+        "network_details": {
+          "host_routable_ip_addresses": [],
+          "qumulo_ip_addresses": [
+            {
+              "address": "10.220.2.137",
+              "assigned_by": "STATIC",
+              "floating_addresses": [
+                "10.220.2.147",
+                "10.220.2.152"
+              ],
+              "gateway": null,
+              "netmask": "255.255.0.0",
+              "network_id": 0
+            }
+          ],
+          "use_for": "FRONTEND_AND_BACKEND"
+        },
+        "permanent_mac_address": null,
+        "speed": "20000",
+        "timestamp": "1770755188728",
+        "vlan_id": null
+      }
+    ],
+    "environment": {
+      "dns_search_domains": [
+        "domain.local"
+      ],
+      "dns_servers": [
+        "10.102.0.11"
+      ],
+      "systemwide_default_gateways": [
+        "10.220.0.1"
+      ]
+    },
+    "managed_interface_statuses": [
+      {
+        "details": "",
+        "name": "bond0",
+        "status": "APPLIED"
+      }
+    ],
+    "network_statuses": {},
+    "node_id": 2,
+    "node_name": "music-2"
+  },
+  {
+    "cloud_status": null,
+    "devices": [
+      {
+        "bonding_mode": "IEEE_8023AD",
+        "bytes_received": "602765897411",
+        "bytes_sent": "643226269760",
+        "cable_status": "CONNECTED",
+        "interface_status": "UP",
+        "mac_address": "e4:1d:2d:bb:c9:60",
+        "mtu": 1500,
+        "name": "bond0",
+        "network_details": {
+          "host_routable_ip_addresses": [],
+          "qumulo_ip_addresses": [
+            {
+              "address": "10.220.2.140",
+              "assigned_by": "STATIC",
+              "floating_addresses": [
+                "10.220.2.150",
+                "10.220.249.5"
+              ],
+              "gateway": null,
+              "netmask": "255.255.0.0",
+              "network_id": 0
+            }
+          ],
+          "use_for": "FRONTEND_AND_BACKEND"
+        },
+        "permanent_mac_address": null,
+        "speed": "10000",
+        "timestamp": "1770755188723",
+        "vlan_id": null
+      }
+    ],
+    "environment": {
+      "dns_search_domains": [
+        "domain.local"
+      ],
+      "dns_servers": [
+        "10.102.0.11"
+      ],
+      "systemwide_default_gateways": [
+        "10.220.0.1"
+      ]
+    },
+    "managed_interface_statuses": [
+      {
+        "details": "",
+        "name": "bond0",
+        "status": "APPLIED"
+      }
+    ],
+    "network_statuses": {},
+    "node_id": 5,
+    "node_name": "music-5"
+  },
+  {
+    "cloud_status": null,
+    "devices": [
+      {
+        "bonding_mode": "IEEE_8023AD",
+        "bytes_received": "458646713639",
+        "bytes_sent": "477390917996",
+        "cable_status": "CONNECTED",
+        "interface_status": "UP",
+        "mac_address": "7c:fe:90:9e:82:80",
+        "mtu": 1500,
+        "name": "bond0",
+        "network_details": {
+          "host_routable_ip_addresses": [],
+          "qumulo_ip_addresses": [
+            {
+              "address": "10.220.2.138",
+              "assigned_by": "STATIC",
+              "floating_addresses": [
+                "10.220.2.148",
+                "10.220.249.3"
+              ],
+              "gateway": null,
+              "netmask": "255.255.0.0",
+              "network_id": 0
+            }
+          ],
+          "use_for": "FRONTEND_AND_BACKEND"
+        },
+        "permanent_mac_address": null,
+        "speed": "20000",
+        "timestamp": "1770755188724",
+        "vlan_id": null
+      }
+    ],
+    "environment": {
+      "dns_search_domains": [
+        "domain.local"
+      ],
+      "dns_servers": [
+        "10.102.0.11"
+      ],
+      "systemwide_default_gateways": [
+        "10.220.0.1"
+      ]
+    },
+    "managed_interface_statuses": [
+      {
+        "details": "",
+        "name": "bond0",
+        "status": "APPLIED"
+      }
+    ],
+    "network_statuses": {},
+    "node_id": 3,
+    "node_name": "music-3"
+  },
+  {
+    "cloud_status": null,
+    "devices": [
+      {
+        "bonding_mode": "IEEE_8023AD",
+        "bytes_received": "5304465363105",
+        "bytes_sent": "5421188427435",
+        "cable_status": "CONNECTED",
+        "interface_status": "UP",
+        "mac_address": "50:6b:4b:db:6f:70",
+        "mtu": 1500,
+        "name": "bond0",
+        "network_details": {
+          "host_routable_ip_addresses": [],
+          "qumulo_ip_addresses": [
+            {
+              "address": "10.220.2.141",
+              "assigned_by": "STATIC",
+              "floating_addresses": [
+                "10.220.2.151",
+                "10.220.249.6"
+              ],
+              "gateway": null,
+              "netmask": "255.255.0.0",
+              "network_id": 0
+            }
+          ],
+          "use_for": "FRONTEND_AND_BACKEND"
+        },
+        "permanent_mac_address": null,
+        "speed": "50000",
+        "timestamp": "1770755188736",
+        "vlan_id": null
+      }
+    ],
+    "environment": {
+      "dns_search_domains": [
+        "domain.local"
+      ],
+      "dns_servers": [
+        "10.102.0.11"
+      ],
+      "systemwide_default_gateways": [
+        "10.220.0.1"
+      ]
+    },
+    "managed_interface_statuses": [
+      {
+        "details": "",
+        "name": "bond0",
+        "status": "APPLIED"
+      }
+    ],
+    "network_statuses": {},
+    "node_id": 6,
+    "node_name": "music-6"
+  },
+  {
+    "cloud_status": null,
+    "devices": [
+      {
+        "bonding_mode": "IEEE_8023AD",
+        "bytes_received": "537767953969",
+        "bytes_sent": "623480752545",
+        "cable_status": "CONNECTED",
+        "interface_status": "UP",
+        "mac_address": "e4:1d:2d:6d:7a:00",
+        "mtu": 1500,
+        "name": "bond0",
+        "network_details": {
+          "host_routable_ip_addresses": [],
+          "qumulo_ip_addresses": [
+            {
+              "address": "10.220.2.139",
+              "assigned_by": "STATIC",
+              "floating_addresses": [
+                "10.220.2.149",
+                "10.220.249.4"
+              ],
+              "gateway": null,
+              "netmask": "255.255.0.0",
+              "network_id": 0
+            }
+          ],
+          "use_for": "FRONTEND_AND_BACKEND"
+        },
+        "permanent_mac_address": null,
+        "speed": "20000",
+        "timestamp": "1770755188722",
+        "vlan_id": null
+      }
+    ],
+    "environment": {
+      "dns_search_domains": [
+        "domain.local"
+      ],
+      "dns_servers": [
+        "10.102.0.11"
+      ],
+      "systemwide_default_gateways": [
+        "10.220.0.1"
+      ]
+    },
+    "managed_interface_statuses": [
+      {
+        "details": "",
+        "name": "bond0",
+        "status": "APPLIED"
+      }
+    ],
+    "network_statuses": {},
+    "node_id": 4,
+    "node_name": "music-4"
+  }
+]

@@ -1,0 +1,62 @@
+[
+  {
+    "id": 1,
+    "label": "0c:42:a1:6a:aa:1c",
+    "mac_address": "10:70:fd:1b:fe:18",
+    "model_number": "C192T",
+    "node_name": "iss-sg-1",
+    "node_status": "online",
+    "serial_number": "S0602225400B",
+    "uuid": "ce5899cc-9f50-49bb-98e7-d33628f7ba4a"
+  },
+  {
+    "id": 2,
+    "label": "0c:42:a1:2f:66:46",
+    "mac_address": "0c:42:a1:2f:66:46",
+    "model_number": "C192T",
+    "node_name": "iss-sg-2",
+    "node_status": "online",
+    "serial_number": "S06021244010",
+    "uuid": "84745c6b-2633-4e42-9649-347196c826a5"
+  },
+  {
+    "id": 3,
+    "label": "b8:ce:f6:36:d1:02",
+    "mac_address": "b8:ce:f6:36:d1:02",
+    "model_number": "C192T",
+    "node_name": "iss-sg-3",
+    "node_status": "online",
+    "serial_number": "S0602124400D",
+    "uuid": "a3dbeb60-2b2b-48cc-b5b6-9704fd93629f"
+  },
+  {
+    "id": 4,
+    "label": "b8:ce:f6:1d:4f:4a",
+    "mac_address": "b8:ce:f6:1d:4f:4a",
+    "model_number": "C192T",
+    "node_name": "iss-sg-4",
+    "node_status": "online",
+    "serial_number": "S0602124400F",
+    "uuid": "ef69e218-808b-440d-9fd4-9179fa3bf86b"
+  },
+  {
+    "id": 5,
+    "label": "b8:59:9f:b7:ba:9c",
+    "mac_address": "b8:59:9f:b7:ba:9c",
+    "model_number": "QCT_D52T_240TB_L2",
+    "node_name": "iss-sg-5",
+    "node_status": "online",
+    "serial_number": "QTFCOU122003C",
+    "uuid": "6a8db61b-6868-4632-8807-02d53566b187"
+  },
+  {
+    "id": 6,
+    "label": "0c:42:a1:2a:0c:cc",
+    "mac_address": "0c:42:a1:2a:0c:cc",
+    "model_number": "C192T",
+    "node_name": "iss-sg-6",
+    "node_status": "online",
+    "serial_number": "S06020214020",
+    "uuid": "4bf55cce-1f1c-4c1a-9401-5836c16e18cf"
+  }
+]

@@ -1,0 +1,102 @@
+[
+  {
+    "connections": [
+      {
+        "network_address": "10.220.1.7",
+        "tenant_id": 1,
+        "type": "CONNECTION_TYPE_NFS"
+      },
+      {
+        "network_address": "10.220.1.6",
+        "tenant_id": 1,
+        "type": "CONNECTION_TYPE_REST"
+      },
+      {
+        "network_address": "10.102.0.74",
+        "tenant_id": 1,
+        "type": "CONNECTION_TYPE_NFS"
+      },
+      {
+        "network_address": "10.220.1.250",
+        "tenant_id": 1,
+        "type": "CONNECTION_TYPE_NFS"
+      },
+      {
+        "network_address": "10.220.1.247",
+        "tenant_id": 1,
+        "type": "CONNECTION_TYPE_NFS"
+      },
+      {
+        "network_address": "10.116.0.48",
+        "tenant_id": 1,
+        "type": "CONNECTION_TYPE_NFS"
+      },
+      {
+        "network_address": "127.0.0.1",
+        "tenant_id": 1,
+        "type": "CONNECTION_TYPE_REST"
+      },
+      {
+        "network_address": "10.116.10.152",
+        "tenant_id": 1,
+        "type": "CONNECTION_TYPE_NFS"
+      },
+      {
+        "network_address": "10.220.14.99",
+        "tenant_id": 1,
+        "type": "CONNECTION_TYPE_REST"
+      },
+      {
+        "network_address": "10.220.1.248",
+        "tenant_id": 1,
+        "type": "CONNECTION_TYPE_NFS"
+      },
+      {
+        "network_address": "10.220.1.249",
+        "tenant_id": 1,
+        "type": "CONNECTION_TYPE_NFS"
+      },
+      {
+        "network_address": "127.0.0.1",
+        "tenant_id": null,
+        "type": "CONNECTION_TYPE_REST"
+      },
+      {
+        "network_address": "10.102.0.72",
+        "tenant_id": 1,
+        "type": "CONNECTION_TYPE_NFS"
+      }
+    ],
+    "id": 1
+  },
+  {
+    "connections": [
+      {
+        "network_address": "127.0.0.1",
+        "tenant_id": 1,
+        "type": "CONNECTION_TYPE_REST"
+      },
+      {
+        "network_address": "127.0.0.1",
+        "tenant_id": null,
+        "type": "CONNECTION_TYPE_REST"
+      }
+    ],
+    "id": 2
+  },
+  {
+    "connections": [
+      {
+        "network_address": "127.0.0.1",
+        "tenant_id": 1,
+        "type": "CONNECTION_TYPE_REST"
+      },
+      {
+        "network_address": "127.0.0.1",
+        "tenant_id": 1,
+        "type": "CONNECTION_TYPE_REST"
+      }
+    ],
+    "id": 3
+  }
+]

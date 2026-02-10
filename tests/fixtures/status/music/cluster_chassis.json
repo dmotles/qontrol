@@ -1,0 +1,82 @@
+[
+  {
+    "id": 2,
+    "light_visible": false,
+    "psu_statuses": [
+      {
+        "location": "right",
+        "name": "PSU1",
+        "state": "GOOD"
+      },
+      {
+        "location": "left",
+        "name": "PSU2",
+        "state": "GOOD"
+      }
+    ]
+  },
+  {
+    "id": 3,
+    "light_visible": false,
+    "psu_statuses": [
+      {
+        "location": "left",
+        "name": "PSU2",
+        "state": "GOOD"
+      },
+      {
+        "location": "right",
+        "name": "PSU1",
+        "state": "GOOD"
+      }
+    ]
+  },
+  {
+    "id": 4,
+    "light_visible": false,
+    "psu_statuses": [
+      {
+        "location": "left",
+        "name": "PSU2",
+        "state": "GOOD"
+      },
+      {
+        "location": "right",
+        "name": "PSU1",
+        "state": "GOOD"
+      }
+    ]
+  },
+  {
+    "id": 5,
+    "light_visible": false,
+    "psu_statuses": [
+      {
+        "location": "left",
+        "name": "PSU2",
+        "state": "GOOD"
+      },
+      {
+        "location": "right",
+        "name": "PSU1",
+        "state": "GOOD"
+      }
+    ]
+  },
+  {
+    "id": 6,
+    "light_visible": false,
+    "psu_statuses": [
+      {
+        "location": "right",
+        "name": "PSU1",
+        "state": "GOOD"
+      },
+      {
+        "location": "left",
+        "name": "PSU2",
+        "state": "GOOD"
+      }
+    ]
+  }
+]

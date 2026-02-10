@@ -1,0 +1,281 @@
+[
+  {
+    "capacity_used": "799884046589952",
+    "data_used": "793822316576768",
+    "details_status": "AVAILABLE",
+    "metadata_used": "6061730013184",
+    "period_start_time": 1768089600,
+    "snapshot_used": "3987869696",
+    "total_usable": "809268475330560"
+  },
+  {
+    "capacity_used": "798525024980992",
+    "data_used": "792482070171648",
+    "details_status": "AVAILABLE",
+    "metadata_used": "6042954809344",
+    "period_start_time": 1768176000,
+    "snapshot_used": "3987869696",
+    "total_usable": "809268475330560"
+  },
+  {
+    "capacity_used": "801062729768960",
+    "data_used": "794993618010112",
+    "details_status": "AVAILABLE",
+    "metadata_used": "6069111758848",
+    "period_start_time": 1768262400,
+    "snapshot_used": "3987984384",
+    "total_usable": "809268475330560"
+  },
+  {
+    "capacity_used": "801737772576768",
+    "data_used": "795668769824768",
+    "details_status": "AVAILABLE",
+    "metadata_used": "6069002752000",
+    "period_start_time": 1768348800,
+    "snapshot_used": "3987927040",
+    "total_usable": "809268475330560"
+  },
+  {
+    "capacity_used": "804970986835968",
+    "data_used": "798871998713856",
+    "details_status": "AVAILABLE",
+    "metadata_used": "6098988122112",
+    "period_start_time": 1768435200,
+    "snapshot_used": "3987918848",
+    "total_usable": "809268475330560"
+  },
+  {
+    "capacity_used": "806672475648000",
+    "data_used": "800536592793600",
+    "details_status": "AVAILABLE",
+    "metadata_used": "6135882854400",
+    "period_start_time": 1768521600,
+    "snapshot_used": "3987959808",
+    "total_usable": "809268475330560"
+  },
+  {
+    "capacity_used": "805508795314176",
+    "data_used": "799354838564864",
+    "details_status": "AVAILABLE",
+    "metadata_used": "6153956749312",
+    "period_start_time": 1768608000,
+    "snapshot_used": "3987959808",
+    "total_usable": "809268475330560"
+  },
+  {
+    "capacity_used": "807399752974336",
+    "data_used": "801265240322048",
+    "details_status": "AVAILABLE",
+    "metadata_used": "6134512652288",
+    "period_start_time": 1768694400,
+    "snapshot_used": "3987959808",
+    "total_usable": "809268475330560"
+  },
+  {
+    "capacity_used": "809012231757824",
+    "data_used": "802878660161536",
+    "details_status": "AVAILABLE",
+    "metadata_used": "6133571596288",
+    "period_start_time": 1768780800,
+    "snapshot_used": "157842849792",
+    "total_usable": "809268475330560"
+  },
+  {
+    "capacity_used": "806248902356992",
+    "data_used": "800143071481856",
+    "details_status": "AVAILABLE",
+    "metadata_used": "6105830875136",
+    "period_start_time": 1768867200,
+    "snapshot_used": "3987324928",
+    "total_usable": "809268475330560"
+  },
+  {
+    "capacity_used": "796885780307968",
+    "data_used": "790803468091392",
+    "details_status": "AVAILABLE",
+    "metadata_used": "6082312216576",
+    "period_start_time": 1768953600,
+    "snapshot_used": "3987288064",
+    "total_usable": "809268475330560"
+  },
+  {
+    "capacity_used": "786518067318784",
+    "data_used": "780439344893952",
+    "details_status": "AVAILABLE",
+    "metadata_used": "6078722424832",
+    "period_start_time": 1769040000,
+    "snapshot_used": "3987271680",
+    "total_usable": "809268475330560"
+  },
+  {
+    "capacity_used": "777573674684416",
+    "data_used": "771530200178688",
+    "details_status": "AVAILABLE",
+    "metadata_used": "6043474505728",
+    "period_start_time": 1769126400,
+    "snapshot_used": "3987435520",
+    "total_usable": "809268475330560"
+  },
+  {
+    "capacity_used": "779266180132864",
+    "data_used": "773206330626048",
+    "details_status": "AVAILABLE",
+    "metadata_used": "6059849506816",
+    "period_start_time": 1769212800,
+    "snapshot_used": "3987443712",
+    "total_usable": "809268475330560"
+  },
+  {
+    "capacity_used": "773199757373440",
+    "data_used": "767202359259136",
+    "details_status": "AVAILABLE",
+    "metadata_used": "5997398114304",
+    "period_start_time": 1769299200,
+    "snapshot_used": "3987443712",
+    "total_usable": "809268475330560"
+  },
+  {
+    "capacity_used": "775748130168832",
+    "data_used": "769740394147840",
+    "details_status": "AVAILABLE",
+    "metadata_used": "6007736020992",
+    "period_start_time": 1769385600,
+    "snapshot_used": "3987443712",
+    "total_usable": "809268475330560"
+  },
+  {
+    "capacity_used": "778292447420416",
+    "data_used": "772248160489472",
+    "details_status": "AVAILABLE",
+    "metadata_used": "6044286930944",
+    "period_start_time": 1769472000,
+    "snapshot_used": "3987406848",
+    "total_usable": "809268475330560"
+  },
+  {
+    "capacity_used": "778907858829312",
+    "data_used": "772812532215808",
+    "details_status": "AVAILABLE",
+    "metadata_used": "6095326613504",
+    "period_start_time": 1769558400,
+    "snapshot_used": "3987271680",
+    "total_usable": "809268475330560"
+  },
+  {
+    "capacity_used": "776033269579776",
+    "data_used": "769937215782912",
+    "details_status": "AVAILABLE",
+    "metadata_used": "6096053796864",
+    "period_start_time": 1769644800,
+    "snapshot_used": "3987300352",
+    "total_usable": "809268475330560"
+  },
+  {
+    "capacity_used": "775977741078528",
+    "data_used": "769885103149056",
+    "details_status": "AVAILABLE",
+    "metadata_used": "6092637929472",
+    "period_start_time": 1769731200,
+    "snapshot_used": "3987304448",
+    "total_usable": "809268475330560"
+  },
+  {
+    "capacity_used": "774897235566592",
+    "data_used": "768793601159168",
+    "details_status": "AVAILABLE",
+    "metadata_used": "6103634407424",
+    "period_start_time": 1769817600,
+    "snapshot_used": "3987312640",
+    "total_usable": "809268475330560"
+  },
+  {
+    "capacity_used": "773158948675584",
+    "data_used": "767075338633216",
+    "details_status": "AVAILABLE",
+    "metadata_used": "6083610042368",
+    "period_start_time": 1769904000,
+    "snapshot_used": "3987320832",
+    "total_usable": "809268475330560"
+  },
+  {
+    "capacity_used": "773488025387008",
+    "data_used": "767390980579328",
+    "details_status": "AVAILABLE",
+    "metadata_used": "6097044807680",
+    "period_start_time": 1769990400,
+    "snapshot_used": "3987320832",
+    "total_usable": "809268475330560"
+  },
+  {
+    "capacity_used": "772959663648768",
+    "data_used": "766833042272256",
+    "details_status": "AVAILABLE",
+    "metadata_used": "6126621376512",
+    "period_start_time": 1770076800,
+    "snapshot_used": "3987320832",
+    "total_usable": "809268475330560"
+  },
+  {
+    "capacity_used": "778092784812032",
+    "data_used": "771963210252288",
+    "details_status": "AVAILABLE",
+    "metadata_used": "6129574559744",
+    "period_start_time": 1770163200,
+    "snapshot_used": "3987247104",
+    "total_usable": "809268475330560"
+  },
+  {
+    "capacity_used": "777730673250304",
+    "data_used": "771610252107776",
+    "details_status": "AVAILABLE",
+    "metadata_used": "6120421142528",
+    "period_start_time": 1770249600,
+    "snapshot_used": "3987316736",
+    "total_usable": "809268475330560"
+  },
+  {
+    "capacity_used": "778886742970368",
+    "data_used": "772778018926592",
+    "details_status": "AVAILABLE",
+    "metadata_used": "6108724043776",
+    "period_start_time": 1770336000,
+    "snapshot_used": "3987329024",
+    "total_usable": "809268475330560"
+  },
+  {
+    "capacity_used": "782120419733504",
+    "data_used": "775985464954880",
+    "details_status": "AVAILABLE",
+    "metadata_used": "6134954778624",
+    "period_start_time": 1770422400,
+    "snapshot_used": "3987304448",
+    "total_usable": "809268475330560"
+  },
+  {
+    "capacity_used": "781762584387584",
+    "data_used": "775664275582976",
+    "details_status": "AVAILABLE",
+    "metadata_used": "6098308804608",
+    "period_start_time": 1770508800,
+    "snapshot_used": "3987304448",
+    "total_usable": "809268475330560"
+  },
+  {
+    "capacity_used": "782507207819264",
+    "data_used": "776413556084736",
+    "details_status": "AVAILABLE",
+    "metadata_used": "6093651734528",
+    "period_start_time": 1770595200,
+    "snapshot_used": "3987304448",
+    "total_usable": "809268475330560"
+  },
+  {
+    "capacity_used": "778111354707968",
+    "data_used": "772030554365952",
+    "details_status": "AVAILABLE",
+    "metadata_used": "6080800342016",
+    "period_start_time": 1770681600,
+    "snapshot_used": "3987304448",
+    "total_usable": "809268475330560"
+  }
+]

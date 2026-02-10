@@ -1,0 +1,32 @@
+[
+  {
+    "id": 1,
+    "label": "02:9a:63:e5:b8:ef",
+    "mac_address": "02:9a:63:e5:b8:ef",
+    "model_number": "AWS",
+    "node_name": "aws-gravytrain-1",
+    "node_status": "online",
+    "serial_number": "ec2609a2-aa2b-8c42-61d3-16b2fc0bb882",
+    "uuid": "afdde4b3-e0f1-423e-a61e-815ea99a71f5"
+  },
+  {
+    "id": 2,
+    "label": "02:38:25:c9:7c:17",
+    "mac_address": "02:38:25:c9:7c:17",
+    "model_number": "AWS",
+    "node_name": "aws-gravytrain-2",
+    "node_status": "online",
+    "serial_number": "ec2cf02d-6e6f-cada-2ce6-2c31ba75b686",
+    "uuid": "a668930b-d8ef-4442-96e2-3342a735f412"
+  },
+  {
+    "id": 3,
+    "label": "02:f4:8f:e0:82:cf",
+    "mac_address": "02:f4:8f:e0:82:cf",
+    "model_number": "AWS",
+    "node_name": "aws-gravytrain-3",
+    "node_status": "online",
+    "serial_number": "ec22788b-20ac-5e4c-5370-d694ce320cb8",
+    "uuid": "2c5b6868-77eb-419d-9827-e3aa83759007"
+  }
+]

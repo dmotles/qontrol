@@ -1,0 +1,52 @@
+[
+  {
+    "id": 2,
+    "label": "e4:1d:2d:e4:1d:c0",
+    "mac_address": "e4:1d:2d:e4:1d:c0",
+    "model_number": "Q0626",
+    "node_name": "music-2",
+    "node_status": "online",
+    "serial_number": "sCC1402004",
+    "uuid": "23ed021a-f478-4ad2-8e43-4593e8e40ad2"
+  },
+  {
+    "id": 3,
+    "label": "7c:fe:90:9e:82:80",
+    "mac_address": "7c:fe:90:9e:82:80",
+    "model_number": "Q0626",
+    "node_name": "music-3",
+    "node_status": "online",
+    "serial_number": "sCE3409006",
+    "uuid": "57b7bbd9-e008-4538-9ad5-e0485bb72639"
+  },
+  {
+    "id": 4,
+    "label": "e4:1d:2d:6d:7a:00",
+    "mac_address": "e4:1d:2d:6d:7a:00",
+    "model_number": "Q0626",
+    "node_name": "music-4",
+    "node_status": "online",
+    "serial_number": "sCC130800E",
+    "uuid": "6dd981b6-1165-49e5-b55f-c454e54f1b1e"
+  },
+  {
+    "id": 5,
+    "label": "e4:1d:2d:bb:c9:60",
+    "mac_address": "e4:1d:2d:bb:c9:60",
+    "model_number": "Q0626",
+    "node_name": "music-5",
+    "node_status": "online",
+    "serial_number": "sCC130400A",
+    "uuid": "10ba2780-11b4-4ddc-b0c3-facb23bd9bf7"
+  },
+  {
+    "id": 6,
+    "label": "50:6b:4b:db:6f:70",
+    "mac_address": "50:6b:4b:db:6f:70",
+    "model_number": "C72T",
+    "node_name": "music-6",
+    "node_status": "online",
+    "serial_number": "S05018323020",
+    "uuid": "258ac338-d3fe-447c-a9ce-b2aa1591d89a"
+  }
+]

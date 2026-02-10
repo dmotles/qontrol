@@ -1,0 +1,10 @@
+{
+  "blocked_reason": "",
+  "coordinator_node": 6,
+  "data_at_risk": false,
+  "elapsed_seconds": 0,
+  "estimated_seconds_left": 0,
+  "percent_complete": 0,
+  "phase": "",
+  "status": "NOT_RUNNING"
+}

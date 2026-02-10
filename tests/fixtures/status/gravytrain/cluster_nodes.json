@@ -1,0 +1,52 @@
+[
+  {
+    "id": 1,
+    "label": "b8:ce:f6:36:d7:ba",
+    "mac_address": "b8:ce:f6:36:d7:ba",
+    "model_number": "C192T",
+    "node_name": "gravytrain-sg-1",
+    "node_status": "online",
+    "serial_number": "S0602124400C",
+    "uuid": "74eeb137-3170-4e48-8073-ba67abb9b400"
+  },
+  {
+    "id": 2,
+    "label": "b8:ce:f6:36:d2:f2",
+    "mac_address": "b8:ce:f6:36:d2:f2",
+    "model_number": "C192T",
+    "node_name": "gravytrain-sg-2",
+    "node_status": "online",
+    "serial_number": "S0602124400A",
+    "uuid": "d33c67cc-0757-488c-90a9-c57faa6d400a"
+  },
+  {
+    "id": 3,
+    "label": "b8:ce:f6:1d:4e:1a",
+    "mac_address": "b8:ce:f6:1d:4e:1a",
+    "model_number": "C192T",
+    "node_name": "gravytrain-sg-3",
+    "node_status": "online",
+    "serial_number": "S06021254003",
+    "uuid": "b2fe2983-3323-4e90-968b-5ab670331e13"
+  },
+  {
+    "id": 4,
+    "label": "b8:ce:f6:1d:4a:8a",
+    "mac_address": "b8:ce:f6:1d:4a:8a",
+    "model_number": "C192T",
+    "node_name": "gravytrain-sg-4",
+    "node_status": "online",
+    "serial_number": "S0602124400B",
+    "uuid": "89d30431-e36c-42d2-85ac-598768e0b876"
+  },
+  {
+    "id": 5,
+    "label": "0c:42:a1:72:c5:ca",
+    "mac_address": "0c:42:a1:72:c5:ca",
+    "model_number": "QCT_D52T_240TB_L2",
+    "node_name": "gravytrain-sg-5",
+    "node_status": "online",
+    "serial_number": "QTFCOU2240099",
+    "uuid": "bd87a6af-55d6-497d-b21f-daf10e9e5e2e"
+  }
+]

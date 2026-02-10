@@ -1,0 +1,297 @@
+[
+  {
+    "cloud_status": null,
+    "devices": [
+      {
+        "bonding_mode": "IEEE_8023AD",
+        "bytes_received": "68298512192224",
+        "bytes_sent": "91175678764088",
+        "cable_status": "CONNECTED",
+        "interface_status": "UP",
+        "mac_address": "b8:ce:f6:1d:4a:8a",
+        "mtu": 9000,
+        "name": "bond0",
+        "network_details": {
+          "host_routable_ip_addresses": [],
+          "qumulo_ip_addresses": [
+            {
+              "address": "10.100.0.36",
+              "assigned_by": "STATIC",
+              "floating_addresses": [
+                "10.100.0.40",
+                "10.100.0.45",
+                "10.100.0.86"
+              ],
+              "gateway": null,
+              "netmask": "255.255.0.0",
+              "network_id": 0
+            }
+          ],
+          "use_for": "FRONTEND_AND_BACKEND"
+        },
+        "permanent_mac_address": null,
+        "speed": "200000",
+        "timestamp": "1770755192751",
+        "vlan_id": null
+      }
+    ],
+    "environment": {
+      "dns_search_domains": [
+        "corp.qumulo.com"
+      ],
+      "dns_servers": [
+        "10.102.0.11",
+        "10.100.0.11"
+      ],
+      "systemwide_default_gateways": [
+        "10.100.0.1"
+      ]
+    },
+    "managed_interface_statuses": [
+      {
+        "details": "",
+        "name": "bond0",
+        "status": "APPLIED"
+      }
+    ],
+    "network_statuses": {},
+    "node_id": 4,
+    "node_name": "gravytrain-sg-4"
+  },
+  {
+    "cloud_status": null,
+    "devices": [
+      {
+        "bonding_mode": "IEEE_8023AD",
+        "bytes_received": "46793175793685",
+        "bytes_sent": "60931091547924",
+        "cable_status": "CONNECTED",
+        "interface_status": "UP",
+        "mac_address": "b8:ce:f6:1d:4e:1a",
+        "mtu": 9000,
+        "name": "bond0",
+        "network_details": {
+          "host_routable_ip_addresses": [],
+          "qumulo_ip_addresses": [
+            {
+              "address": "10.100.0.35",
+              "assigned_by": "STATIC",
+              "floating_addresses": [
+                "10.100.0.39",
+                "10.100.0.44",
+                "10.100.0.85"
+              ],
+              "gateway": null,
+              "netmask": "255.255.0.0",
+              "network_id": 0
+            }
+          ],
+          "use_for": "FRONTEND_AND_BACKEND"
+        },
+        "permanent_mac_address": null,
+        "speed": "200000",
+        "timestamp": "1770755192760",
+        "vlan_id": null
+      }
+    ],
+    "environment": {
+      "dns_search_domains": [
+        "corp.qumulo.com"
+      ],
+      "dns_servers": [
+        "10.100.0.11",
+        "10.102.0.11"
+      ],
+      "systemwide_default_gateways": [
+        "10.100.0.1"
+      ]
+    },
+    "managed_interface_statuses": [
+      {
+        "details": "",
+        "name": "bond0",
+        "status": "APPLIED"
+      }
+    ],
+    "network_statuses": {},
+    "node_id": 3,
+    "node_name": "gravytrain-sg-3"
+  },
+  {
+    "cloud_status": null,
+    "devices": [
+      {
+        "bonding_mode": "IEEE_8023AD",
+        "bytes_received": "62594297491115",
+        "bytes_sent": "103859518838817",
+        "cable_status": "CONNECTED",
+        "interface_status": "UP",
+        "mac_address": "0c:42:a1:72:c5:ca",
+        "mtu": 9000,
+        "name": "bond0",
+        "network_details": {
+          "host_routable_ip_addresses": [],
+          "qumulo_ip_addresses": [
+            {
+              "address": "10.100.0.76",
+              "assigned_by": "STATIC",
+              "floating_addresses": [
+                "10.100.0.41",
+                "10.100.0.46",
+                "10.100.0.87"
+              ],
+              "gateway": null,
+              "netmask": "255.255.0.0",
+              "network_id": 0
+            }
+          ],
+          "use_for": "FRONTEND_AND_BACKEND"
+        },
+        "permanent_mac_address": null,
+        "speed": "200000",
+        "timestamp": "1770755192747",
+        "vlan_id": null
+      }
+    ],
+    "environment": {
+      "dns_search_domains": [
+        "corp.qumulo.com"
+      ],
+      "dns_servers": [
+        "10.100.0.11",
+        "10.102.0.11"
+      ],
+      "systemwide_default_gateways": [
+        "10.100.0.1"
+      ]
+    },
+    "managed_interface_statuses": [
+      {
+        "details": "",
+        "name": "bond0",
+        "status": "APPLIED"
+      }
+    ],
+    "network_statuses": {},
+    "node_id": 5,
+    "node_name": "gravytrain-sg-5"
+  },
+  {
+    "cloud_status": null,
+    "devices": [
+      {
+        "bonding_mode": "IEEE_8023AD",
+        "bytes_received": "177598244784274",
+        "bytes_sent": "226517765219358",
+        "cable_status": "CONNECTED",
+        "interface_status": "UP",
+        "mac_address": "b8:ce:f6:36:d7:ba",
+        "mtu": 9000,
+        "name": "bond0",
+        "network_details": {
+          "host_routable_ip_addresses": [],
+          "qumulo_ip_addresses": [
+            {
+              "address": "10.100.0.33",
+              "assigned_by": "STATIC",
+              "floating_addresses": [
+                "10.100.0.37",
+                "10.100.0.42",
+                "10.100.0.47"
+              ],
+              "gateway": null,
+              "netmask": "255.255.0.0",
+              "network_id": 0
+            }
+          ],
+          "use_for": "FRONTEND_AND_BACKEND"
+        },
+        "permanent_mac_address": null,
+        "speed": "200000",
+        "timestamp": "1770755192740",
+        "vlan_id": null
+      }
+    ],
+    "environment": {
+      "dns_search_domains": [
+        "corp.qumulo.com"
+      ],
+      "dns_servers": [
+        "10.102.0.11",
+        "10.100.0.11"
+      ],
+      "systemwide_default_gateways": [
+        "10.100.0.1"
+      ]
+    },
+    "managed_interface_statuses": [
+      {
+        "details": "",
+        "name": "bond0",
+        "status": "APPLIED"
+      }
+    ],
+    "network_statuses": {},
+    "node_id": 1,
+    "node_name": "gravytrain-sg-1"
+  },
+  {
+    "cloud_status": null,
+    "devices": [
+      {
+        "bonding_mode": "IEEE_8023AD",
+        "bytes_received": "53988971154108",
+        "bytes_sent": "77630814899382",
+        "cable_status": "CONNECTED",
+        "interface_status": "UP",
+        "mac_address": "b8:ce:f6:36:d2:f2",
+        "mtu": 9000,
+        "name": "bond0",
+        "network_details": {
+          "host_routable_ip_addresses": [],
+          "qumulo_ip_addresses": [
+            {
+              "address": "10.100.0.34",
+              "assigned_by": "STATIC",
+              "floating_addresses": [
+                "10.100.0.38",
+                "10.100.0.43",
+                "10.100.0.48"
+              ],
+              "gateway": null,
+              "netmask": "255.255.0.0",
+              "network_id": 0
+            }
+          ],
+          "use_for": "FRONTEND_AND_BACKEND"
+        },
+        "permanent_mac_address": null,
+        "speed": "200000",
+        "timestamp": "1770755192750",
+        "vlan_id": null
+      }
+    ],
+    "environment": {
+      "dns_search_domains": [
+        "corp.qumulo.com"
+      ],
+      "dns_servers": [
+        "10.100.0.11",
+        "10.102.0.11"
+      ],
+      "systemwide_default_gateways": [
+        "10.100.0.1"
+      ]
+    },
+    "managed_interface_statuses": [
+      {
+        "details": "",
+        "name": "bond0",
+        "status": "APPLIED"
+      }
+    ],
+    "network_statuses": {},
+    "node_id": 2,
+    "node_name": "gravytrain-sg-2"
+  }
+]

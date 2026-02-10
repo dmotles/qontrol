@@ -1,0 +1,32 @@
+[
+  {
+    "id": 5,
+    "label": "00:0d:3a:80:a3:28",
+    "mac_address": "00:0d:3a:80:a3:28",
+    "model_number": "Azure",
+    "node_name": "gravytrain-east-5",
+    "node_status": "online",
+    "serial_number": "0000-0006-7298-3844-1171-4040-21",
+    "uuid": "f03d28c5-43e7-4b92-9760-db0698dc51a9"
+  },
+  {
+    "id": 6,
+    "label": "00:22:48:19:c0:f1",
+    "mac_address": "00:22:48:19:c0:f1",
+    "model_number": "Azure",
+    "node_name": "gravytrain-east-6",
+    "node_status": "online",
+    "serial_number": "0000-0000-6752-2024-2734-3356-61",
+    "uuid": "5f608872-8cbb-4be4-af44-f2b7c40b0476"
+  },
+  {
+    "id": 7,
+    "label": "60:45:bd:56:52:c2",
+    "mac_address": "60:45:bd:56:52:c2",
+    "model_number": "Azure",
+    "node_name": "gravytrain-east-7",
+    "node_status": "online",
+    "serial_number": "0000-0002-2013-7384-4931-4940-90",
+    "uuid": "ce5add9e-5e4a-41da-96ee-633cf2d88900"
+  }
+]
