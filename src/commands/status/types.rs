@@ -63,6 +63,23 @@ pub struct ClusterStatus {
 pub struct NodeStatus {
     pub total: usize,
     pub online: usize,
+    #[serde(default)]
+    pub details: Vec<NodeNetworkInfo>,
+}
+
+/// Per-node network details: connections, NIC throughput, link speed.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NodeNetworkInfo {
+    pub node_id: u64,
+    pub connections: u32,
+    #[serde(default)]
+    pub connection_breakdown: HashMap<String, u32>,
+    /// Current NIC throughput in bits per second (None if unavailable)
+    pub nic_throughput_bps: Option<u64>,
+    /// Link speed in bits per second (None for cloud clusters)
+    pub nic_link_speed_bps: Option<u64>,
+    /// NIC utilization percentage (None for cloud clusters)
+    pub nic_utilization_pct: Option<f64>,
 }
 
 /// Capacity metrics.
@@ -211,6 +228,7 @@ mod tests {
             nodes: NodeStatus {
                 total: 4,
                 online: 4,
+                details: vec![],
             },
             capacity: CapacityStatus {
                 total_bytes: 1_000_000,
@@ -232,6 +250,48 @@ mod tests {
         assert_eq!(back.name, "my-cluster");
         assert_eq!(back.cluster_type, ClusterType::AnqAzure);
         assert_eq!(back.nodes.total, 4);
+    }
+
+    #[test]
+    fn test_node_network_info_serde_roundtrip() {
+        let info = NodeNetworkInfo {
+            node_id: 1,
+            connections: 42,
+            connection_breakdown: {
+                let mut m = HashMap::new();
+                m.insert("NFS".to_string(), 30);
+                m.insert("REST".to_string(), 12);
+                m
+            },
+            nic_throughput_bps: Some(12_400_000_000),
+            nic_link_speed_bps: Some(200_000_000_000),
+            nic_utilization_pct: Some(6.2),
+        };
+
+        let json = serde_json::to_string(&info).unwrap();
+        let back: NodeNetworkInfo = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.node_id, 1);
+        assert_eq!(back.connections, 42);
+        assert_eq!(back.connection_breakdown.get("NFS"), Some(&30));
+        assert_eq!(back.nic_throughput_bps, Some(12_400_000_000));
+        assert_eq!(back.nic_link_speed_bps, Some(200_000_000_000));
+    }
+
+    #[test]
+    fn test_node_network_info_cloud_no_link_speed() {
+        let info = NodeNetworkInfo {
+            node_id: 1,
+            connections: 5,
+            connection_breakdown: HashMap::new(),
+            nic_throughput_bps: Some(1_000_000),
+            nic_link_speed_bps: None,
+            nic_utilization_pct: None,
+        };
+
+        let json = serde_json::to_string(&info).unwrap();
+        let back: NodeNetworkInfo = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.nic_link_speed_bps, None);
+        assert_eq!(back.nic_utilization_pct, None);
     }
 
     #[test]
@@ -276,6 +336,7 @@ mod tests {
                 nodes: NodeStatus {
                     total: 1,
                     online: 1,
+                    details: vec![],
                 },
                 capacity: CapacityStatus::default(),
                 activity: ActivityStatus::default(),

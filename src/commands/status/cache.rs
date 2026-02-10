@@ -85,6 +85,7 @@ mod tests {
             nodes: NodeStatus {
                 total: 1,
                 online: 1,
+                details: vec![],
             },
             capacity: CapacityStatus::default(),
             activity: ActivityStatus::default(),

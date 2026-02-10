@@ -168,6 +168,14 @@ impl QumuloClient {
         self.request("GET", "/v1/analytics/activity/current", None)
     }
 
+    pub fn get_network_connections(&self) -> Result<Value> {
+        self.request("GET", "/v2/network/connections/", None)
+    }
+
+    pub fn get_network_status(&self) -> Result<Value> {
+        self.request("GET", "/v3/network/status", None)
+    }
+
     // Snapshot methods
 
     pub fn get_snapshots(&self) -> Result<Value> {
