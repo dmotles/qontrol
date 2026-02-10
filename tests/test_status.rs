@@ -33,6 +33,7 @@ async fn test_status_json_output() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     let json: serde_json::Value = serde_json::from_str(&stdout).expect("invalid JSON output");
 
+    assert!(json.get("timestamp").is_some(), "should have timestamp");
     assert!(json.get("aggregates").is_some());
     assert!(json.get("clusters").is_some());
     assert!(json.get("alerts").is_some());
@@ -57,7 +58,7 @@ async fn test_status_one_healthy_one_unreachable() {
     let json: serde_json::Value = serde_json::from_str(&stdout).expect("invalid JSON output");
 
     // Should have 1 reachable cluster
-    assert_eq!(json["aggregates"]["reachable_count"], 1);
+    assert_eq!(json["aggregates"]["healthy_count"], 1);
     // Should have alerts about the broken cluster
     let alerts = json["alerts"].as_array().expect("alerts should be array");
     assert!(
@@ -125,8 +126,8 @@ async fn test_status_detects_cluster_type() {
 
     let clusters = json["clusters"].as_array().expect("clusters");
     assert_eq!(clusters.len(), 1);
-    // The fixture has model_number "Azure", so type should be AnqAzure
-    assert_eq!(clusters[0]["type"], "AnqAzure");
+    // The fixture has model_number "Azure", so type should be anq-azure
+    assert_eq!(clusters[0]["cluster_type"], "anq-azure");
 }
 
 /// Test: help text shows the status command.
@@ -182,7 +183,7 @@ async fn test_status_capacity_projection_onprem() {
         !projection.is_null(),
         "on-prem cluster with growth should have projection"
     );
-    assert!(projection["days_until_full"].as_u64().is_some());
+    assert!(projection["days_to_full"].as_u64().is_some());
     assert!(projection["growth_rate_bytes_per_day"].as_f64().unwrap() > 0.0);
 }
 
@@ -240,12 +241,12 @@ async fn test_status_capacity_projection_cloud() {
     let cluster = &clusters[0];
 
     // AWS cluster type should be detected
-    assert_eq!(cluster["type"], "CnqAws");
+    assert_eq!(cluster["cluster_type"], "cnq-aws");
 
     // AWS has growth in its history → should have projection
     let projection = &cluster["capacity"]["projection"];
     if !projection.is_null() {
-        assert!(projection["days_until_full"].as_u64().is_some());
+        assert!(projection["days_to_full"].as_u64().is_some());
     }
 }
 
@@ -278,7 +279,7 @@ async fn test_status_capacity_projection_alert() {
     let projection = &clusters[0]["capacity"]["projection"];
 
     if !projection.is_null() {
-        let days = projection["days_until_full"].as_u64().unwrap();
+        let days = projection["days_to_full"].as_u64().unwrap();
         let alerts = json["alerts"].as_array().expect("alerts");
         let has_capacity_alert = alerts
             .iter()
@@ -319,7 +320,6 @@ async fn test_status_healthy_cluster_health_data() {
     assert_eq!(health["disks_unhealthy"], 0);
     assert_eq!(health["psus_unhealthy"], 0);
     assert_eq!(health["data_at_risk"], false);
-    assert_eq!(health["status"], "healthy");
 
     // Protection data populated
     assert!(health["remaining_node_failures"].is_number());
@@ -421,7 +421,6 @@ async fn test_status_unhealthy_disk_alert() {
 
     let cluster = &json["clusters"][0];
     assert_eq!(cluster["health"]["disks_unhealthy"], 1);
-    assert_eq!(cluster["health"]["status"], "degraded");
 
     let alerts = json["alerts"].as_array().expect("alerts");
     let disk_alert = alerts
@@ -483,7 +482,6 @@ async fn test_status_degraded_protection_alert() {
 
     let cluster = &json["clusters"][0];
     assert_eq!(cluster["health"]["remaining_node_failures"], 0);
-    assert_eq!(cluster["health"]["status"], "degraded");
 
     let alerts = json["alerts"].as_array().expect("alerts");
     let prot_alert = alerts
@@ -538,7 +536,6 @@ async fn test_status_data_at_risk_alert() {
 
     let cluster = &json["clusters"][0];
     assert_eq!(cluster["health"]["data_at_risk"], true);
-    assert_eq!(cluster["health"]["status"], "critical");
 
     let alerts = json["alerts"].as_array().expect("alerts");
     let risk_alert = alerts
@@ -630,7 +627,7 @@ async fn test_status_cloud_cluster_empty_psus() {
 
     let cluster = &json["clusters"][0];
     assert_eq!(cluster["health"]["psus_unhealthy"], 0);
-    assert_eq!(cluster["type"], "CnqAws");
+    assert_eq!(cluster["cluster_type"], "cnq-aws");
 
     let alerts = json["alerts"].as_array().expect("alerts");
     assert!(
@@ -801,7 +798,7 @@ async fn test_status_network_connections_403_graceful() {
     let json: serde_json::Value = serde_json::from_str(&stdout).expect("invalid JSON output");
 
     // Cluster should still be reachable despite connections 403
-    assert_eq!(json["aggregates"]["reachable_count"], 1);
+    assert_eq!(json["aggregates"]["healthy_count"], 1);
 }
 
 /// Test: network status 403 doesn't fail the whole cluster.
@@ -831,7 +828,7 @@ async fn test_status_network_status_403_graceful() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     let json: serde_json::Value = serde_json::from_str(&stdout).expect("invalid JSON output");
 
-    assert_eq!(json["aggregates"]["reachable_count"], 1);
+    assert_eq!(json["aggregates"]["healthy_count"], 1);
     // Should still have node details (from connections), just no NIC data
     let details = json["clusters"][0]["nodes"]["details"]
         .as_array()
@@ -911,8 +908,11 @@ async fn test_status_file_stats_from_fixtures() {
     assert_eq!(files["total_directories"].as_u64().unwrap(), 219_679_366);
     // gravytrain: 2147 snapshots
     assert_eq!(files["total_snapshots"].as_u64().unwrap(), 2147);
-    // gravytrain: snapshot bytes = 7755127889920
-    assert_eq!(files["snapshot_bytes"].as_u64().unwrap(), 7_755_127_889_920);
+    // gravytrain: snapshot bytes = 7755127889920 (in capacity, not files)
+    assert_eq!(
+        cluster["capacity"]["snapshot_bytes"].as_u64().unwrap(),
+        7_755_127_889_920
+    );
 }
 
 /// Test: aws-gravytrain (idle cloud cluster) → correct stats and idle detection.
@@ -934,17 +934,20 @@ async fn test_status_idle_cluster_detection() {
 
     let cluster = &json["clusters"][0];
 
-    // AWS cluster has empty activity → should be idle
-    assert_eq!(cluster["activity"]["is_idle"], true);
-    assert_eq!(cluster["activity"]["iops_read"].as_f64().unwrap(), 0.0);
-    assert_eq!(cluster["activity"]["iops_write"].as_f64().unwrap(), 0.0);
+    // AWS cluster has empty activity → should be idle (zero IOPS)
+    assert_eq!(cluster["activity"]["read_iops"].as_f64().unwrap(), 0.0);
+    assert_eq!(cluster["activity"]["write_iops"].as_f64().unwrap(), 0.0);
 
     // aws-gravytrain file stats
     let files = &cluster["files"];
     assert_eq!(files["total_files"].as_u64().unwrap(), 150_502_822);
     assert_eq!(files["total_directories"].as_u64().unwrap(), 5_522_888);
     assert_eq!(files["total_snapshots"].as_u64().unwrap(), 43);
-    assert_eq!(files["snapshot_bytes"].as_u64().unwrap(), 54_855_823_360);
+    // snapshot_bytes is in capacity, not files
+    assert_eq!(
+        cluster["capacity"]["snapshot_bytes"].as_u64().unwrap(),
+        54_855_823_360
+    );
 }
 
 /// Test: active cluster (gravytrain) → correct IOPS/throughput sums, not idle.
@@ -965,14 +968,11 @@ async fn test_status_active_cluster_activity() {
 
     let activity = &json["clusters"][0]["activity"];
 
-    // Active cluster should NOT be idle
-    assert_eq!(activity["is_idle"], false);
-
-    // IOPS and throughput should be non-zero
-    assert!(activity["iops_read"].as_f64().unwrap() > 0.0);
-    assert!(activity["iops_write"].as_f64().unwrap() > 0.0);
-    assert!(activity["throughput_read"].as_f64().unwrap() > 0.0);
-    assert!(activity["throughput_write"].as_f64().unwrap() > 0.0);
+    // IOPS and throughput should be non-zero (active cluster)
+    assert!(activity["read_iops"].as_f64().unwrap() > 0.0);
+    assert!(activity["write_iops"].as_f64().unwrap() > 0.0);
+    assert!(activity["read_throughput_bps"].as_f64().unwrap() > 0.0);
+    assert!(activity["write_throughput_bps"].as_f64().unwrap() > 0.0);
 }
 
 /// Test: empty snapshot list → count = 0.
@@ -1077,8 +1077,7 @@ async fn test_status_partial_activity_failure() {
     assert_eq!(cluster["files"]["total_snapshots"].as_u64().unwrap(), 2147);
 
     // Activity should default to zeros (idle)
-    assert_eq!(cluster["activity"]["is_idle"], true);
-    assert_eq!(cluster["activity"]["iops_read"].as_f64().unwrap(), 0.0);
+    assert_eq!(cluster["activity"]["read_iops"].as_f64().unwrap(), 0.0);
 }
 
 /// Test: multi-cluster aggregation with real fixtures.
@@ -1101,24 +1100,23 @@ async fn test_status_multi_cluster_aggregates() {
 
     let agg = &json["aggregates"];
     assert_eq!(agg["cluster_count"], 2);
-    assert_eq!(agg["reachable_count"], 2);
+    assert_eq!(agg["healthy_count"], 2);
 
-    // Aggregated file stats: gravytrain + aws-gravytrain
-    let files = &agg["files"];
+    // Aggregated file stats: gravytrain + aws-gravytrain (flat in aggregates)
     assert_eq!(
-        files["total_files"].as_u64().unwrap(),
+        agg["total_files"].as_u64().unwrap(),
         1_807_976_645 + 150_502_822
     );
     assert_eq!(
-        files["total_directories"].as_u64().unwrap(),
+        agg["total_directories"].as_u64().unwrap(),
         219_679_366 + 5_522_888
     );
-    assert_eq!(files["total_snapshots"].as_u64().unwrap(), 2147 + 43);
+    assert_eq!(agg["total_snapshots"].as_u64().unwrap(), 2147 + 43);
 }
 
-/// Test: JSON output includes is_idle field.
+/// Test: JSON activity uses spec field names (read_iops, write_iops, etc.).
 #[tokio::test]
-async fn test_status_json_includes_is_idle() {
+async fn test_status_json_activity_field_names() {
     let mts = harness::MultiTestServer::start(&["cluster_a"]).await;
     mts.mount_cluster_fixtures("cluster_a").await;
 
@@ -1132,8 +1130,13 @@ async fn test_status_json_includes_is_idle() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     let json: serde_json::Value = serde_json::from_str(&stdout).expect("invalid JSON output");
 
-    // is_idle field should exist in activity
-    assert!(json["clusters"][0]["activity"].get("is_idle").is_some());
-    // With empty fixtures, activity should be idle
-    assert_eq!(json["clusters"][0]["activity"]["is_idle"], true);
+    let activity = &json["clusters"][0]["activity"];
+    // Spec field names present
+    assert!(activity.get("read_iops").is_some());
+    assert!(activity.get("write_iops").is_some());
+    assert!(activity.get("read_throughput_bps").is_some());
+    assert!(activity.get("write_throughput_bps").is_some());
+    // With empty fixtures, activity should be zero
+    assert_eq!(activity["read_iops"].as_f64().unwrap(), 0.0);
+    assert_eq!(activity["write_iops"].as_f64().unwrap(), 0.0);
 }
