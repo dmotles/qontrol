@@ -1140,3 +1140,188 @@ async fn test_status_json_activity_field_names() {
     assert_eq!(activity["read_iops"].as_f64().unwrap(), 0.0);
     assert_eq!(activity["write_iops"].as_f64().unwrap(), 0.0);
 }
+
+// ── Watch mode tests ──────────────────────────────────────────────────────────
+
+/// Test: watch mode prints the refresh footer.
+#[tokio::test]
+async fn test_status_watch_mode_shows_footer() {
+    let mts = harness::MultiTestServer::start(&["cluster_a"]).await;
+    mts.mount_cluster_fixtures("cluster_a").await;
+
+    let output = mts
+        .command()
+        .args(["status", "--watch", "--interval", "1"])
+        .timeout(std::time::Duration::from_secs(3))
+        .output()
+        .expect("failed to execute");
+
+    // Process was killed by timeout — expected for watch mode
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("Refreshing every 1s"),
+        "should show watch footer"
+    );
+}
+
+/// Test: watch mode with JSON output produces valid JSON on each poll.
+#[tokio::test]
+async fn test_status_watch_mode_json_multiple_polls() {
+    let mts = harness::MultiTestServer::start(&["cluster_a"]).await;
+    mts.mount_cluster_fixtures("cluster_a").await;
+
+    let output = mts
+        .command()
+        .args(["status", "--watch", "--interval", "1", "--json"])
+        .timeout(std::time::Duration::from_secs(4))
+        .output()
+        .expect("failed to execute");
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    // Parse multiple JSON objects from the output (they are concatenated)
+    let mut decoder = serde_json::Deserializer::from_str(&stdout).into_iter::<serde_json::Value>();
+    let mut count = 0;
+    while let Some(Ok(_json)) = decoder.next() {
+        count += 1;
+    }
+    assert!(
+        count >= 2,
+        "watch mode should produce at least 2 JSON outputs, got {}",
+        count
+    );
+}
+
+/// Test: watch mode NIC throughput shows null on first poll, real data on second.
+#[tokio::test]
+async fn test_status_watch_mode_nic_delta_between_polls() {
+    use wiremock::matchers::{method, path};
+    use wiremock::{Mock, ResponseTemplate};
+
+    let mts = harness::MultiTestServer::start(&["nic_delta"]).await;
+
+    // Mount all standard fixtures except network_status
+    for fixture in &[
+        "cluster_settings",
+        "version",
+        "cluster_nodes",
+        "filesystem",
+        "analytics_activity",
+        "cluster_slots",
+        "cluster_chassis",
+        "cluster_protection_status",
+        "cluster_restriper_status",
+        "network_connections",
+    ] {
+        mts.mount_fixture("nic_delta", fixture).await;
+    }
+    mts.mount_empty_response("nic_delta", "GET", "/v1/files/%2F/recursive-aggregates/")
+        .await;
+    mts.mount_empty_response("nic_delta", "GET", "/v2/snapshots/")
+        .await;
+    mts.mount_empty_response("nic_delta", "GET", "/v1/snapshots/total-used-capacity")
+        .await;
+
+    // Get the underlying mock server for direct wiremock access
+    let (_, server) = &mts.servers[0];
+
+    // NIC data for first poll: bytes_sent=1000000, bytes_received=2000000
+    let nic_data_1 = serde_json::json!([{
+        "node_id": 1,
+        "devices": [{
+            "name": "bond0",
+            "bytes_sent": "1000000",
+            "bytes_received": "2000000",
+            "speed": "200000",
+            "interface_status": "UP",
+            "network_details": {"use_for": "FRONTEND_AND_BACKEND"}
+        }],
+        "environment": {"dns_search_domains": []}
+    }]);
+
+    // NIC data for second poll: bytes increased by 125,000 each
+    let nic_data_2 = serde_json::json!([{
+        "node_id": 1,
+        "devices": [{
+            "name": "bond0",
+            "bytes_sent": "1125000",
+            "bytes_received": "2125000",
+            "speed": "200000",
+            "interface_status": "UP",
+            "network_details": {"use_for": "FRONTEND_AND_BACKEND"}
+        }],
+        "environment": {"dns_search_domains": []}
+    }]);
+
+    // Mount first poll response (highest priority, consumed after 1 use)
+    Mock::given(method("GET"))
+        .and(path("/v3/network/status"))
+        .respond_with(
+            ResponseTemplate::new(200).set_body_raw(nic_data_1.to_string(), "application/json"),
+        )
+        .up_to_n_times(1)
+        .with_priority(1)
+        .mount(server)
+        .await;
+
+    // Mount second poll response (lower priority — fallback after first exhausted)
+    Mock::given(method("GET"))
+        .and(path("/v3/network/status"))
+        .respond_with(
+            ResponseTemplate::new(200).set_body_raw(nic_data_2.to_string(), "application/json"),
+        )
+        .with_priority(2)
+        .mount(server)
+        .await;
+
+    let output = mts
+        .command()
+        .args(["status", "--watch", "--interval", "1", "--json"])
+        .timeout(std::time::Duration::from_secs(5))
+        .output()
+        .expect("failed to execute");
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    // Parse all JSON outputs
+    let mut decoder = serde_json::Deserializer::from_str(&stdout).into_iter::<serde_json::Value>();
+    let mut polls: Vec<serde_json::Value> = Vec::new();
+    while let Some(Ok(json)) = decoder.next() {
+        polls.push(json);
+    }
+
+    assert!(
+        polls.len() >= 2,
+        "need at least 2 polls for delta test, got {}",
+        polls.len()
+    );
+
+    // First poll: NIC throughput should be null (no previous data)
+    let first_details = &polls[0]["clusters"][0]["nodes"]["details"];
+    let first_nodes = first_details.as_array().expect("first poll node details");
+    assert!(
+        !first_nodes.is_empty(),
+        "should have node details on first poll"
+    );
+    assert!(
+        first_nodes[0]["nic_throughput_bps"].is_null(),
+        "first poll NIC throughput should be null, got: {}",
+        first_nodes[0]["nic_throughput_bps"]
+    );
+
+    // Second poll: NIC throughput should be non-null and positive
+    let second_details = &polls[1]["clusters"][0]["nodes"]["details"];
+    let second_nodes = second_details.as_array().expect("second poll node details");
+    assert!(
+        !second_nodes.is_empty(),
+        "should have node details on second poll"
+    );
+    let throughput = second_nodes[0]["nic_throughput_bps"]
+        .as_u64()
+        .expect("second poll should have numeric NIC throughput");
+    assert!(
+        throughput > 0,
+        "second poll NIC throughput should be positive, got: {}",
+        throughput
+    );
+}

@@ -82,6 +82,10 @@ pub struct NodeNetworkInfo {
     pub nic_link_speed_bps: Option<u64>,
     /// NIC utilization percentage (None for cloud clusters)
     pub nic_utilization_pct: Option<f64>,
+    /// Raw total bytes (sent + received) for watch mode delta computation.
+    /// Not serialized to JSON output.
+    #[serde(skip)]
+    pub nic_bytes_total: Option<u64>,
 }
 
 /// Capacity metrics.
@@ -327,6 +331,7 @@ mod tests {
             nic_throughput_bps: Some(12_400_000_000),
             nic_link_speed_bps: Some(200_000_000_000),
             nic_utilization_pct: Some(6.2),
+            nic_bytes_total: None,
         };
 
         let json = serde_json::to_string(&info).unwrap();
@@ -347,6 +352,7 @@ mod tests {
             nic_throughput_bps: Some(1_000_000),
             nic_link_speed_bps: None,
             nic_utilization_pct: None,
+            nic_bytes_total: None,
         };
 
         let json = serde_json::to_string(&info).unwrap();

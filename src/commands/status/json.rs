@@ -321,6 +321,7 @@ mod tests {
                             nic_throughput_bps: Some(12_400_000_000),
                             nic_link_speed_bps: Some(200_000_000_000),
                             nic_utilization_pct: Some(6.2),
+                            nic_bytes_total: None,
                         }],
                     },
                     capacity: CapacityStatus {
@@ -382,6 +383,7 @@ mod tests {
                             nic_throughput_bps: Some(1_000_000),
                             nic_link_speed_bps: None,
                             nic_utilization_pct: None,
+                            nic_bytes_total: None,
                         }],
                     },
                     capacity: CapacityStatus {

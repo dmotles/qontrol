@@ -12,15 +12,19 @@ use super::detection::detect_cluster_type;
 use super::health;
 use super::types::*;
 
-/// Per-node NIC stats: (throughput_bps, link_speed_bps, utilization_pct)
-type NicStatsMap = std::collections::HashMap<u64, (Option<u64>, Option<u64>, Option<f64>)>;
+/// Per-node NIC stats: (throughput_bps, link_speed_bps, utilization_pct, raw_bytes_total)
+type NicStatsMap =
+    std::collections::HashMap<u64, (Option<u64>, Option<u64>, Option<f64>, Option<u64>)>;
 
 /// Collect status from all configured clusters (or a filtered subset) in parallel.
+/// When `watch_mode` is true, NIC stats use a single call (no 1-second sleep)
+/// and return raw byte counters for inter-poll delta computation.
 pub fn collect_all(
     config: &Config,
     profile_filters: &[String],
     timeout_secs: u64,
     no_cache: bool,
+    watch_mode: bool,
 ) -> Result<EnvironmentStatus> {
     // Determine which profiles to query
     let profiles: Vec<(String, ProfileEntry)> = if profile_filters.is_empty() {
@@ -52,7 +56,7 @@ pub fn collect_all(
             .map(|(name, entry)| {
                 let name = name.clone();
                 let entry = entry.clone();
-                s.spawn(move || collect_cluster(&name, &entry, timeout_secs))
+                s.spawn(move || collect_cluster(&name, &entry, timeout_secs, watch_mode))
             })
             .collect();
 
@@ -137,7 +141,12 @@ pub fn collect_all(
 }
 
 /// Collect status from a single cluster. Returns a ClusterResult.
-fn collect_cluster(profile: &str, entry: &ProfileEntry, timeout_secs: u64) -> ClusterResult {
+fn collect_cluster(
+    profile: &str,
+    entry: &ProfileEntry,
+    timeout_secs: u64,
+    watch_mode: bool,
+) -> ClusterResult {
     let start = Instant::now();
 
     let client = match QumuloClient::new(entry, timeout_secs) {
@@ -224,7 +233,7 @@ fn collect_cluster(profile: &str, entry: &ProfileEntry, timeout_secs: u64) -> Cl
     let mut capacity = fetch_capacity(&client);
     let activity = fetch_activity(&client);
     let files = fetch_file_stats(&client);
-    let node_details = fetch_node_network_details(&client, &cluster_type);
+    let node_details = fetch_node_network_details(&client, &cluster_type, watch_mode);
 
     // Fetch capacity history and compute projection
     capacity.projection = fetch_capacity_projection(
@@ -536,12 +545,14 @@ fn parse_byte_value(val: &Value) -> u64 {
 }
 
 /// Collect per-node network details: connections + NIC stats.
+/// When `watch_mode` is true, NIC stats use a single call and return raw byte counters.
 fn fetch_node_network_details(
     client: &QumuloClient,
     cluster_type: &ClusterType,
+    watch_mode: bool,
 ) -> Vec<NodeNetworkInfo> {
     let connections_by_node = fetch_connections_per_node(client);
-    let nic_stats_by_node = fetch_nic_stats_per_node(client, cluster_type);
+    let nic_stats_by_node = fetch_nic_stats_per_node(client, cluster_type, watch_mode);
 
     // Merge connection data and NIC data by node_id
     let mut node_ids: std::collections::BTreeSet<u64> = std::collections::BTreeSet::new();
@@ -560,10 +571,10 @@ fn fetch_node_network_details(
                 .cloned()
                 .unwrap_or_default();
 
-            let (throughput, link_speed, utilization) = nic_stats_by_node
+            let (throughput, link_speed, utilization, raw_bytes) = nic_stats_by_node
                 .get(&node_id)
                 .cloned()
-                .unwrap_or((None, None, None));
+                .unwrap_or((None, None, None, None));
 
             NodeNetworkInfo {
                 node_id,
@@ -572,6 +583,7 @@ fn fetch_node_network_details(
                 nic_throughput_bps: throughput,
                 nic_link_speed_bps: link_speed,
                 nic_utilization_pct: utilization,
+                nic_bytes_total: raw_bytes,
             }
         })
         .collect()
@@ -637,8 +649,15 @@ fn normalize_connection_type(raw: &str) -> String {
 
 /// Fetch NIC stats for each node. For on-prem, also extracts link speed and computes utilization.
 /// Uses the bond0 device (primary frontend/backend interface).
-/// Returns map of node_id → (throughput_bps, link_speed_bps, utilization_pct)
-fn fetch_nic_stats_per_node(client: &QumuloClient, cluster_type: &ClusterType) -> NicStatsMap {
+/// Returns map of node_id → (throughput_bps, link_speed_bps, utilization_pct, raw_bytes_total)
+///
+/// When `watch_mode` is true, only makes a single NIC call and returns raw byte counters
+/// (no throughput). The caller computes throughput from deltas between polls.
+fn fetch_nic_stats_per_node(
+    client: &QumuloClient,
+    cluster_type: &ClusterType,
+    watch_mode: bool,
+) -> NicStatsMap {
     let mut result = std::collections::HashMap::new();
     let is_cloud = matches!(cluster_type, ClusterType::CnqAws | ClusterType::AnqAzure);
 
@@ -650,6 +669,13 @@ fn fetch_nic_stats_per_node(client: &QumuloClient, cluster_type: &ClusterType) -
             return result;
         }
     };
+
+    // In watch mode, return raw byte counters only (no throughput).
+    // The watch loop will compute throughput from deltas between polls.
+    if watch_mode {
+        parse_nic_data_single_with_bytes(&data1, is_cloud, &mut result);
+        return result;
+    }
 
     // Sleep 1 second then make second call for throughput delta
     std::thread::sleep(std::time::Duration::from_secs(1));
@@ -670,7 +696,7 @@ fn fetch_nic_stats_per_node(client: &QumuloClient, cluster_type: &ClusterType) -
     result
 }
 
-/// Parse NIC data from a single call (no throughput available).
+/// Parse NIC data from a single call (no throughput available, no raw bytes).
 fn parse_nic_data_single(data: &Value, is_cloud: bool, result: &mut NicStatsMap) {
     let nodes = match data.as_array() {
         Some(a) => a,
@@ -686,7 +712,27 @@ fn parse_nic_data_single(data: &Value, is_cloud: bool, result: &mut NicStatsMap)
         let (link_speed_bps, _) = extract_bond0_stats(node);
         let link_speed = if is_cloud { None } else { link_speed_bps };
 
-        result.insert(node_id, (None, link_speed, None));
+        result.insert(node_id, (None, link_speed, None, None));
+    }
+}
+
+/// Parse NIC data from a single call, returning raw byte counters for watch mode.
+fn parse_nic_data_single_with_bytes(data: &Value, is_cloud: bool, result: &mut NicStatsMap) {
+    let nodes = match data.as_array() {
+        Some(a) => a,
+        None => return,
+    };
+
+    for node in nodes {
+        let node_id = match node["node_id"].as_u64() {
+            Some(id) => id,
+            None => continue,
+        };
+
+        let (link_speed_bps, total_bytes) = extract_bond0_stats(node);
+        let link_speed = if is_cloud { None } else { link_speed_bps };
+
+        result.insert(node_id, (None, link_speed, None, Some(total_bytes)));
     }
 }
 
@@ -732,7 +778,7 @@ fn parse_nic_data_delta(data1: &Value, data2: &Value, is_cloud: bool, result: &m
             _ => None,
         };
 
-        result.insert(node_id, (throughput, link_speed, utilization));
+        result.insert(node_id, (throughput, link_speed, utilization, None));
     }
 }
 
@@ -1236,7 +1282,7 @@ mod tests {
         let mut result = std::collections::HashMap::new();
         parse_nic_data_delta(&data1, &data2, false, &mut result);
 
-        let (throughput, link_speed, utilization) = result.get(&1).unwrap();
+        let (throughput, link_speed, utilization, _) = result.get(&1).unwrap();
         // Delta: (1125000+2125000) - (1000000+2000000) = 250000 bytes
         // Throughput: 250000 * 8 = 2_000_000 bps
         assert_eq!(*throughput, Some(2_000_000));
@@ -1274,7 +1320,7 @@ mod tests {
         let mut result = std::collections::HashMap::new();
         parse_nic_data_delta(&data1, &data2, true, &mut result);
 
-        let (throughput, link_speed, utilization) = result.get(&1).unwrap();
+        let (throughput, link_speed, utilization, _) = result.get(&1).unwrap();
         assert_eq!(*throughput, Some(1_600_000)); // (200000 delta) * 8
         assert_eq!(*link_speed, None); // cloud = no link speed
         assert_eq!(*utilization, None); // cloud = no utilization
@@ -1297,7 +1343,7 @@ mod tests {
         let mut result = std::collections::HashMap::new();
         parse_nic_data_single(&data, false, &mut result);
 
-        let (throughput, link_speed, utilization) = result.get(&1).unwrap();
+        let (throughput, link_speed, utilization, _) = result.get(&1).unwrap();
         assert_eq!(*throughput, None); // single call = no throughput
         assert_eq!(*link_speed, Some(200_000_000_000));
         assert_eq!(*utilization, None); // no throughput = no utilization
@@ -1355,8 +1401,8 @@ mod tests {
         let mut result = std::collections::HashMap::new();
         parse_nic_data_delta(&data1, &data2, false, &mut result);
 
-        let (_, link1, _) = result.get(&1).unwrap();
-        let (_, link2, _) = result.get(&2).unwrap();
+        let (_, link1, _, _) = result.get(&1).unwrap();
+        let (_, link2, _, _) = result.get(&2).unwrap();
         assert_eq!(*link1, Some(200_000_000_000)); // 200 Gbps
         assert_eq!(*link2, Some(100_000_000_000)); // 100 Gbps
     }

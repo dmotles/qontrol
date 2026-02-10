@@ -829,6 +829,7 @@ mod tests {
                 nic_throughput_bps: Some(12_400_000_000),
                 nic_link_speed_bps: Some(200_000_000_000),
                 nic_utilization_pct: Some(6.0),
+                nic_bytes_total: None,
             },
             NodeNetworkInfo {
                 node_id: 2,
@@ -837,6 +838,7 @@ mod tests {
                 nic_throughput_bps: Some(1_100_000_000),
                 nic_link_speed_bps: Some(200_000_000_000),
                 nic_utilization_pct: Some(1.0),
+                nic_bytes_total: None,
             },
             NodeNetworkInfo {
                 node_id: 3,
@@ -845,6 +847,7 @@ mod tests {
                 nic_throughput_bps: Some(800_000_000),
                 nic_link_speed_bps: Some(200_000_000_000),
                 nic_utilization_pct: Some(0.4),
+                nic_bytes_total: None,
             },
             NodeNetworkInfo {
                 node_id: 4,
@@ -853,6 +856,7 @@ mod tests {
                 nic_throughput_bps: Some(200_000_000),
                 nic_link_speed_bps: Some(100_000_000_000),
                 nic_utilization_pct: Some(0.2),
+                nic_bytes_total: None,
             },
             NodeNetworkInfo {
                 node_id: 5,
@@ -861,6 +865,7 @@ mod tests {
                 nic_throughput_bps: Some(400_000_000),
                 nic_link_speed_bps: Some(100_000_000_000),
                 nic_utilization_pct: Some(0.4),
+                nic_bytes_total: None,
             },
         ];
 
@@ -938,6 +943,7 @@ mod tests {
                 nic_throughput_bps: Some(0),
                 nic_link_speed_bps: None,
                 nic_utilization_pct: None,
+                nic_bytes_total: None,
             },
             NodeNetworkInfo {
                 node_id: 2,
@@ -946,6 +952,7 @@ mod tests {
                 nic_throughput_bps: Some(0),
                 nic_link_speed_bps: None,
                 nic_utilization_pct: None,
+                nic_bytes_total: None,
             },
             NodeNetworkInfo {
                 node_id: 3,
@@ -954,6 +961,7 @@ mod tests {
                 nic_throughput_bps: Some(0),
                 nic_link_speed_bps: None,
                 nic_utilization_pct: None,
+                nic_bytes_total: None,
             },
         ];
 
@@ -1031,6 +1039,7 @@ mod tests {
                 nic_throughput_bps: Some(5_000_000_000),
                 nic_link_speed_bps: Some(200_000_000_000),
                 nic_utilization_pct: Some(2.5),
+                nic_bytes_total: None,
             },
             NodeNetworkInfo {
                 node_id: 2,
@@ -1039,6 +1048,7 @@ mod tests {
                 nic_throughput_bps: Some(3_000_000_000),
                 nic_link_speed_bps: Some(200_000_000_000),
                 nic_utilization_pct: Some(1.5),
+                nic_bytes_total: None,
             },
             NodeNetworkInfo {
                 node_id: 3,
@@ -1047,6 +1057,7 @@ mod tests {
                 nic_throughput_bps: Some(1_000_000_000),
                 nic_link_speed_bps: Some(200_000_000_000),
                 nic_utilization_pct: Some(0.5),
+                nic_bytes_total: None,
             },
             NodeNetworkInfo {
                 node_id: 4,
@@ -1055,6 +1066,7 @@ mod tests {
                 nic_throughput_bps: None,
                 nic_link_speed_bps: None,
                 nic_utilization_pct: None,
+                nic_bytes_total: None,
             },
             NodeNetworkInfo {
                 node_id: 5,
@@ -1063,6 +1075,7 @@ mod tests {
                 nic_throughput_bps: Some(500_000_000),
                 nic_link_speed_bps: Some(200_000_000_000),
                 nic_utilization_pct: Some(0.3),
+                nic_bytes_total: None,
             },
             NodeNetworkInfo {
                 node_id: 6,
@@ -1071,6 +1084,7 @@ mod tests {
                 nic_throughput_bps: Some(200_000_000),
                 nic_link_speed_bps: Some(200_000_000_000),
                 nic_utilization_pct: Some(0.1),
+                nic_bytes_total: None,
             },
         ];
 
@@ -1290,6 +1304,7 @@ mod tests {
                     nic_throughput_bps: Some(12_400_000_000),
                     nic_link_speed_bps: Some(200_000_000_000),
                     nic_utilization_pct: Some(6.0),
+                    nic_bytes_total: None,
                 }],
             },
             capacity: CapacityStatus {
