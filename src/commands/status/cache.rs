@@ -92,6 +92,12 @@ mod tests {
             health: HealthStatus {
                 status: HealthLevel::Healthy,
                 issues: vec![],
+                disks_unhealthy: 0,
+                psus_unhealthy: 0,
+                data_at_risk: false,
+                remaining_node_failures: None,
+                remaining_drive_failures: None,
+                protection_type: None,
             },
         }
     }

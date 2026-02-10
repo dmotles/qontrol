@@ -1,0 +1,18 @@
+[
+  {
+    "id": 1,
+    "light_visible": false,
+    "psu_statuses": [
+      {
+        "location": "left",
+        "name": "PSU2",
+        "state": "GOOD"
+      },
+      {
+        "location": "right",
+        "name": "PSU1",
+        "state": "GOOD"
+      }
+    ]
+  }
+]

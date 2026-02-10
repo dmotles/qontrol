@@ -27,6 +27,7 @@ const FIXTURE_ROUTES: &[(&str, &str, &str)] = &[
     ("version", "GET", "/v1/version"),
     ("cluster_nodes", "GET", "/v1/cluster/nodes/"),
     ("filesystem", "GET", "/v1/file-system"),
+    ("file_system", "GET", "/v1/file-system"),
     (
         "analytics_activity",
         "GET",
@@ -59,6 +60,18 @@ const FIXTURE_ROUTES: &[(&str, &str, &str)] = &[
         "snapshots_total_capacity",
         "GET",
         "/v1/snapshots/total-used-capacity",
+    ),
+    ("cluster_slots", "GET", "/v1/cluster/slots/"),
+    ("cluster_chassis", "GET", "/v1/cluster/nodes/chassis/"),
+    (
+        "cluster_protection_status",
+        "GET",
+        "/v1/cluster/protection/status",
+    ),
+    (
+        "cluster_restriper_status",
+        "GET",
+        "/v1/cluster/restriper/status",
     ),
     ("session_login", "POST", "/v1/session/login"),
     ("session_who_am_i", "GET", "/v1/session/who-am-i"),
@@ -251,7 +264,7 @@ base_url = "http://127.0.0.1:{port}"
             .await;
     }
 
-    /// Mount standard cluster fixtures on a profile (settings, version, nodes, fs, activity).
+    /// Mount standard cluster fixtures on a profile (settings, version, nodes, fs, activity, health).
     pub async fn mount_cluster_fixtures(&self, profile: &str) {
         for fixture in &[
             "cluster_settings",
@@ -259,9 +272,93 @@ base_url = "http://127.0.0.1:{port}"
             "cluster_nodes",
             "filesystem",
             "analytics_activity",
+            "cluster_slots",
+            "cluster_chassis",
+            "cluster_protection_status",
+            "cluster_restriper_status",
         ] {
             self.mount_fixture(profile, fixture).await;
         }
+    }
+
+    /// Mount an error response on a specific profile's mock server.
+    pub async fn mount_error(
+        &self,
+        profile: &str,
+        http_method: &str,
+        api_path: &str,
+        status_code: u16,
+    ) {
+        let (_, server) = self
+            .servers
+            .iter()
+            .find(|(n, _)| n == profile)
+            .unwrap_or_else(|| panic!("unknown profile: {}", profile));
+
+        Mock::given(method(http_method))
+            .and(path(api_path))
+            .respond_with(ResponseTemplate::new(status_code).set_body_raw(
+                serde_json::json!({"description": "error", "module": "test"}).to_string(),
+                "application/json",
+            ))
+            .mount(server)
+            .await;
+    }
+
+    /// Mount a fixture from a specific cluster's fixture directory.
+    /// E.g., mount_cluster_specific_fixture("profile_a", "gravytrain", "cluster_slots")
+    /// loads from tests/fixtures/status/gravytrain/cluster_slots.json
+    pub async fn mount_cluster_specific_fixture(
+        &self,
+        profile: &str,
+        cluster_dir: &str,
+        fixture_name: &str,
+    ) {
+        let (_, server) = self
+            .servers
+            .iter()
+            .find(|(n, _)| n == profile)
+            .unwrap_or_else(|| panic!("unknown profile: {}", profile));
+
+        let (_, http_method, api_path) = FIXTURE_ROUTES
+            .iter()
+            .find(|(n, _, _)| *n == fixture_name)
+            .unwrap_or_else(|| panic!("unknown fixture: {}", fixture_name));
+
+        let fixture_path = fixtures_dir()
+            .join("status")
+            .join(cluster_dir)
+            .join(format!("{}.json", fixture_name));
+        let body = std::fs::read_to_string(&fixture_path)
+            .unwrap_or_else(|_| panic!("failed to read fixture: {}", fixture_path.display()));
+
+        Mock::given(method(*http_method))
+            .and(path(*api_path))
+            .respond_with(ResponseTemplate::new(200).set_body_raw(body, "application/json"))
+            .mount(server)
+            .await;
+    }
+
+    /// Mount a raw JSON body on a specific profile's mock server at a given fixture route.
+    pub async fn mount_raw(&self, profile: &str, fixture_name: &str, body: &str) {
+        let (_, server) = self
+            .servers
+            .iter()
+            .find(|(n, _)| n == profile)
+            .unwrap_or_else(|| panic!("unknown profile: {}", profile));
+
+        let (_, http_method, api_path) = FIXTURE_ROUTES
+            .iter()
+            .find(|(n, _, _)| *n == fixture_name)
+            .unwrap_or_else(|| panic!("unknown fixture: {}", fixture_name));
+
+        Mock::given(method(*http_method))
+            .and(path(*api_path))
+            .respond_with(
+                ResponseTemplate::new(200).set_body_raw(body.to_string(), "application/json"),
+            )
+            .mount(server)
+            .await;
     }
 
     /// Build a command that does NOT set QONTROL_BASE_URL (each profile resolves to its own server).

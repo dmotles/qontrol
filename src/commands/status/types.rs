@@ -105,6 +105,36 @@ pub struct FileStats {
 pub struct HealthStatus {
     pub status: HealthLevel,
     pub issues: Vec<String>,
+    #[serde(default)]
+    pub disks_unhealthy: usize,
+    #[serde(default)]
+    pub psus_unhealthy: usize,
+    #[serde(default)]
+    pub data_at_risk: bool,
+    #[serde(default)]
+    pub remaining_node_failures: Option<u64>,
+    #[serde(default)]
+    pub remaining_drive_failures: Option<u64>,
+    #[serde(default)]
+    pub protection_type: Option<String>,
+}
+
+/// Details of an unhealthy disk.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UnhealthyDisk {
+    pub node_id: u64,
+    pub bay: String,
+    pub disk_type: String,
+    pub state: String,
+}
+
+/// Details of an unhealthy PSU.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UnhealthyPsu {
+    pub node_id: u64,
+    pub location: String,
+    pub name: String,
+    pub state: String,
 }
 
 /// Health level enumeration.
@@ -224,6 +254,12 @@ mod tests {
             health: HealthStatus {
                 status: HealthLevel::Healthy,
                 issues: vec![],
+                disks_unhealthy: 0,
+                psus_unhealthy: 0,
+                data_at_risk: false,
+                remaining_node_failures: Some(1),
+                remaining_drive_failures: Some(2),
+                protection_type: Some("PROTECTION_SYSTEM_TYPE_EC".to_string()),
             },
         };
 
@@ -232,6 +268,8 @@ mod tests {
         assert_eq!(back.name, "my-cluster");
         assert_eq!(back.cluster_type, ClusterType::AnqAzure);
         assert_eq!(back.nodes.total, 4);
+        assert_eq!(back.health.disks_unhealthy, 0);
+        assert_eq!(back.health.remaining_node_failures, Some(1));
     }
 
     #[test]
@@ -283,6 +321,12 @@ mod tests {
                 health: HealthStatus {
                     status: HealthLevel::Healthy,
                     issues: vec![],
+                    disks_unhealthy: 0,
+                    psus_unhealthy: 0,
+                    data_at_risk: false,
+                    remaining_node_failures: None,
+                    remaining_drive_failures: None,
+                    protection_type: None,
                 },
             }),
             latency_ms: 10,
