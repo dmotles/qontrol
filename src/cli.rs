@@ -181,9 +181,6 @@ pub enum FsCommands {
         /// Sort by field: name, size, type (default: name)
         #[arg(short, long, default_value = "name")]
         sort: String,
-        /// Page token for pagination (from previous results)
-        #[arg(long)]
-        after: Option<String>,
         /// Maximum number of entries to return
         #[arg(long)]
         limit: Option<u32>,

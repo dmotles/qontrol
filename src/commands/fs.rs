@@ -11,53 +11,90 @@ pub fn ls(
     path: &str,
     long: bool,
     sort: &str,
-    after: Option<&str>,
     limit: Option<u32>,
     json_mode: bool,
 ) -> Result<()> {
-    let response = client
-        .get_file_entries(path, after, limit)
-        .with_context(|| format!("failed to list directory: {}", path))?;
+    use std::io::{IsTerminal, Write};
+
+    let show_progress = std::io::stdout().is_terminal();
+    let mut all_entries: Vec<Value> = Vec::new();
+    let mut after: Option<String> = None;
+
+    loop {
+        // Show progress for subsequent pages
+        if show_progress && after.is_some() {
+            eprint!("\r\x1b[K(loading... {} entries)", all_entries.len());
+            std::io::stderr().flush().ok();
+        }
+
+        let page_limit = limit.map(|l| {
+            let remaining = l as usize - all_entries.len();
+            remaining as u32
+        });
+
+        let response = client
+            .get_file_entries(path, after.as_deref(), page_limit)
+            .with_context(|| format!("failed to list directory: {}", path))?;
+
+        let entries = response
+            .get("files")
+            .and_then(|v| v.as_array())
+            .cloned()
+            .unwrap_or_default();
+
+        all_entries.extend(entries);
+
+        // Check limit
+        if let Some(lim) = limit {
+            if all_entries.len() >= lim as usize {
+                all_entries.truncate(lim as usize);
+                break;
+            }
+        }
+
+        // Check for more pages
+        match response
+            .get("paging")
+            .and_then(|p| p.get("next"))
+            .and_then(|n| n.as_str())
+        {
+            Some(next) if !next.is_empty() => {
+                after = Some(next.to_string());
+            }
+            _ => break,
+        }
+    }
+
+    // Clear progress line
+    if show_progress && after.is_some() {
+        eprint!("\r\x1b[K");
+        std::io::stderr().flush().ok();
+    }
 
     if json_mode {
+        let response = json!({ "files": all_entries });
         println!(
             "{}",
             serde_json::to_string_pretty(&response).unwrap_or_else(|_| response.to_string())
         );
+        eprintln!("{}", format_entry_count(all_entries.len()));
         return Ok(());
     }
 
-    let entries = response
-        .get("files")
-        .and_then(|v| v.as_array())
-        .cloned()
-        .unwrap_or_default();
-
-    if entries.is_empty() {
+    if all_entries.is_empty() {
         println!("(empty directory)");
         return Ok(());
     }
 
-    let mut entries = entries;
-    sort_entries(&mut entries, sort);
+    sort_entries(&mut all_entries, sort);
 
     if long {
-        print_long_listing(&entries);
+        print_long_listing(&all_entries);
     } else {
-        print_short_listing(&entries);
+        print_short_listing(&all_entries);
     }
 
-    // Show pagination hint if there are more results
-    if let Some(paging) = response.get("paging") {
-        if let Some(next) = paging.get("next").and_then(|v| v.as_str()) {
-            if !next.is_empty() {
-                eprintln!(
-                    "\n(more results available, use --after \"{}\" to continue)",
-                    next
-                );
-            }
-        }
-    }
+    eprintln!("{}", format_entry_count(all_entries.len()));
 
     Ok(())
 }
@@ -283,15 +320,9 @@ fn print_tree_recursive(
         return Ok(());
     }
 
-    let response = client
-        .get_file_entries(path, None, None)
+    let entries = client
+        .get_all_file_entries(path)
         .with_context(|| format!("failed to list directory: {}", path))?;
-
-    let entries = response
-        .get("files")
-        .and_then(|v| v.as_array())
-        .cloned()
-        .unwrap_or_default();
 
     let mut sorted_entries = entries;
     sort_entries(&mut sorted_entries, "name");
@@ -360,15 +391,9 @@ fn build_tree_json(
     max_depth: u32,
     current_depth: u32,
 ) -> Result<Value> {
-    let response = client
-        .get_file_entries(path, None, None)
+    let entries = client
+        .get_all_file_entries(path)
         .with_context(|| format!("failed to list directory: {}", path))?;
-
-    let entries = response
-        .get("files")
-        .and_then(|v| v.as_array())
-        .cloned()
-        .unwrap_or_default();
 
     let mut result = Vec::new();
     for entry in &entries {
@@ -483,6 +508,14 @@ fn print_aggregates_summary(aggregates: &Value) {
                 dim_style.apply_to(format!("named stream data: {}", format_size(stream_bytes)))
             );
         }
+    }
+}
+
+fn format_entry_count(count: usize) -> String {
+    if count == 1 {
+        "1 entry".to_string()
+    } else {
+        format!("{} entries", count)
     }
 }
 

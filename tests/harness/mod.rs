@@ -18,7 +18,7 @@ use std::path::{Path, PathBuf};
 
 use assert_cmd::Command;
 use tempfile::TempDir;
-use wiremock::matchers::{method, path};
+use wiremock::matchers::{method, path, query_param};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
 /// Maps fixture name → (HTTP method, API path)
@@ -132,6 +132,36 @@ insecure = true
             ))
             .mount(&self.mock_server)
             .await;
+    }
+
+    /// Mount paginated fixtures for a given API path.
+    ///
+    /// `pages` is a list of `(fixture_name, after_cursor)` where `after_cursor` is
+    /// `None` for the first page and `Some("cursor")` for subsequent pages.
+    pub async fn mount_fixture_paginated(&self, api_path: &str, pages: &[(&str, Option<&str>)]) {
+        for (fixture_name, after_cursor) in pages {
+            let fixture_path = fixtures_dir().join(format!("{}.json", fixture_name));
+            let body = std::fs::read_to_string(&fixture_path)
+                .unwrap_or_else(|_| panic!("failed to read fixture: {}", fixture_path.display()));
+
+            let response = ResponseTemplate::new(200).set_body_raw(body, "application/json");
+
+            if let Some(cursor) = after_cursor {
+                Mock::given(method("GET"))
+                    .and(path(api_path))
+                    .and(query_param("after", *cursor))
+                    .respond_with(response)
+                    .mount(&self.mock_server)
+                    .await;
+            } else {
+                Mock::given(method("GET"))
+                    .and(path(api_path))
+                    .respond_with(response)
+                    .up_to_n_times(1)
+                    .mount(&self.mock_server)
+                    .await;
+            }
+        }
     }
 
     /// Build an assert_cmd Command pre-configured with the test environment.

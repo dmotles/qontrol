@@ -53,6 +53,84 @@ async fn test_fs_ls_json() {
 }
 
 #[tokio::test]
+async fn test_fs_ls_multi_page() {
+    let ts = harness::TestServer::start().await;
+    ts.mount_fixture_paginated(
+        "/v1/files/%2F/entries/",
+        &[
+            ("fs_entries_root_page1", None),
+            ("fs_entries_root_page2", Some("share")),
+        ],
+    )
+    .await;
+
+    ts.command()
+        .args(["fs", "ls", "/"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("home"))
+        .stdout(predicate::str::contains("share"))
+        .stdout(predicate::str::contains("tmp"));
+}
+
+#[tokio::test]
+async fn test_fs_ls_multi_page_json() {
+    let ts = harness::TestServer::start().await;
+    ts.mount_fixture_paginated(
+        "/v1/files/%2F/entries/",
+        &[
+            ("fs_entries_root_page1", None),
+            ("fs_entries_root_page2", Some("share")),
+        ],
+    )
+    .await;
+
+    let output = ts
+        .command()
+        .args(["fs", "ls", "/", "--json"])
+        .output()
+        .expect("failed to execute");
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let json: serde_json::Value = serde_json::from_str(&stdout).expect("invalid JSON output");
+
+    let files = json["files"].as_array().expect("files should be array");
+    assert_eq!(files.len(), 3, "should have all entries from both pages");
+
+    let names: Vec<&str> = files.iter().map(|f| f["name"].as_str().unwrap()).collect();
+    assert!(names.contains(&"home"));
+    assert!(names.contains(&"share"));
+    assert!(names.contains(&"tmp"));
+}
+
+#[tokio::test]
+async fn test_fs_ls_multi_page_with_limit() {
+    let ts = harness::TestServer::start().await;
+    ts.mount_fixture_paginated(
+        "/v1/files/%2F/entries/",
+        &[
+            ("fs_entries_root_page1", None),
+            ("fs_entries_root_page2", Some("share")),
+        ],
+    )
+    .await;
+
+    let output = ts
+        .command()
+        .args(["fs", "ls", "/", "--json", "--limit", "2"])
+        .output()
+        .expect("failed to execute");
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let json: serde_json::Value = serde_json::from_str(&stdout).expect("invalid JSON output");
+
+    let files = json["files"].as_array().expect("files should be array");
+    assert_eq!(files.len(), 2, "should be limited to 2 entries");
+}
+
+#[tokio::test]
 async fn test_fs_stat() {
     let ts = harness::TestServer::start().await;
     ts.mount_fixture("fs_attributes_root").await;
@@ -105,4 +183,26 @@ async fn test_fs_tree() {
         .assert()
         .success()
         .stdout(predicate::str::contains("home"));
+}
+
+#[tokio::test]
+async fn test_fs_tree_multi_page() {
+    let ts = harness::TestServer::start().await;
+    ts.mount_fixture_paginated(
+        "/v1/files/%2F/entries/",
+        &[
+            ("fs_entries_root_page1", None),
+            ("fs_entries_root_page2", Some("share")),
+        ],
+    )
+    .await;
+    ts.mount_fixture("fs_recursive_aggregates_root").await;
+
+    ts.command()
+        .args(["fs", "tree", "/", "--max-depth", "1"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("home"))
+        .stdout(predicate::str::contains("share"))
+        .stdout(predicate::str::contains("tmp"));
 }
