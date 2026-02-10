@@ -2,6 +2,7 @@ pub mod cache;
 pub mod capacity;
 pub mod collector;
 pub mod detection;
+pub mod json;
 pub mod types;
 
 use std::thread;
@@ -28,9 +29,10 @@ pub fn run(
         let status = collector::collect_all(config, profiles, timeout_secs, no_cache)?;
 
         if json_mode {
+            let json_output = json::JsonOutput::from_status(&status);
             println!(
                 "{}",
-                serde_json::to_string_pretty(&status).unwrap_or_else(|_| "{}".to_string())
+                serde_json::to_string_pretty(&json_output).unwrap_or_else(|_| "{}".to_string())
             );
         } else {
             print_status(&status);
