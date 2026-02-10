@@ -168,6 +168,18 @@ impl QumuloClient {
         self.request("GET", "/v1/analytics/activity/current", None)
     }
 
+    /// Fetch capacity history for the last N days.
+    pub fn get_capacity_history(&self, begin_time_epoch: i64) -> Result<Value> {
+        self.request(
+            "GET",
+            &format!(
+                "/v1/analytics/capacity-history/?begin-time={}&interval=DAILY",
+                begin_time_epoch
+            ),
+            None,
+        )
+    }
+
     // Snapshot methods
 
     pub fn get_snapshots(&self) -> Result<Value> {

@@ -73,14 +73,24 @@ pub struct CapacityStatus {
     pub free_bytes: u64,
     pub snapshot_bytes: u64,
     pub used_pct: f64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub projection: Option<CapacityProjection>,
 }
 
-/// Capacity projection (placeholder for future use).
-#[allow(dead_code)]
+/// Capacity projection from linear regression on historical usage data.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CapacityProjection {
     pub days_until_full: Option<u64>,
     pub growth_rate_bytes_per_day: f64,
+    pub confidence: ProjectionConfidence,
+}
+
+/// Confidence level for capacity projections.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum ProjectionConfidence {
+    High,
+    Low,
 }
 
 /// Activity metrics.
@@ -218,6 +228,7 @@ mod tests {
                 free_bytes: 500_000,
                 snapshot_bytes: 0,
                 used_pct: 50.0,
+                projection: None,
             },
             activity: ActivityStatus::default(),
             files: FileStats::default(),

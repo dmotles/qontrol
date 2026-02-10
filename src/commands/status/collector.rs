@@ -7,6 +7,7 @@ use crate::client::QumuloClient;
 use crate::config::{Config, ProfileEntry};
 
 use super::cache;
+use super::capacity;
 use super::detection::detect_cluster_type;
 use super::types::*;
 
@@ -134,6 +135,20 @@ pub fn collect_all(
         }
     }
 
+    // Add capacity projection alerts
+    for cluster in &clusters {
+        if let Some(ref projection) = cluster.capacity.projection {
+            if capacity::should_warn(projection, &cluster.cluster_type) {
+                alerts.push(Alert {
+                    severity: AlertSeverity::Warning,
+                    cluster: cluster.name.clone(),
+                    message: capacity::format_warning(projection, &cluster.cluster_type),
+                    category: "capacity_projection".to_string(),
+                });
+            }
+        }
+    }
+
     Ok(EnvironmentStatus {
         aggregates,
         alerts,
@@ -214,8 +229,16 @@ fn collect_cluster(profile: &str, entry: &ProfileEntry, timeout_secs: u64) -> Cl
         .to_string();
 
     // Fetch optional data — don't fail if these are unavailable
-    let capacity = fetch_capacity(&client);
+    let mut capacity = fetch_capacity(&client);
     let activity = fetch_activity(&client);
+
+    // Fetch capacity history and compute projection
+    capacity.projection = fetch_capacity_projection(
+        &client,
+        capacity.used_bytes,
+        capacity.total_bytes,
+        &cluster_type,
+    );
 
     // Build health status
     let mut issues = Vec::new();
@@ -265,6 +288,27 @@ fn collect_cluster(profile: &str, entry: &ProfileEntry, timeout_secs: u64) -> Cl
     }
 }
 
+fn fetch_capacity_projection(
+    client: &QumuloClient,
+    current_used: u64,
+    total_capacity: u64,
+    _cluster_type: &ClusterType,
+) -> Option<CapacityProjection> {
+    if total_capacity == 0 {
+        return None;
+    }
+    // Fetch 30 days of history
+    let now = chrono::Utc::now().timestamp();
+    let thirty_days_ago = now - 30 * 86400;
+    match client.get_capacity_history(thirty_days_ago) {
+        Ok(history) => capacity::compute_projection(&history, current_used, total_capacity),
+        Err(e) => {
+            tracing::warn!(error = %e, "failed to fetch capacity history");
+            None
+        }
+    }
+}
+
 fn fetch_capacity(client: &QumuloClient) -> CapacityStatus {
     match client.get_file_system() {
         Ok(fs) => {
@@ -283,6 +327,7 @@ fn fetch_capacity(client: &QumuloClient) -> CapacityStatus {
                 free_bytes: free,
                 snapshot_bytes: snapshot,
                 used_pct: pct,
+                projection: None,
             }
         }
         Err(e) => {

@@ -32,6 +32,7 @@ const FIXTURE_ROUTES: &[(&str, &str, &str)] = &[
         "GET",
         "/v1/analytics/activity/current",
     ),
+    ("capacity_history", "GET", "/v1/analytics/capacity-history/"),
     ("fs_entries_root", "GET", "/v1/files/%2F/entries/"),
     ("fs_entries_home", "GET", "/v1/files/%2Fhome/entries/"),
     ("fs_attributes_root", "GET", "/v1/files/%2F/info/attributes"),
@@ -251,6 +252,34 @@ base_url = "http://127.0.0.1:{port}"
             .await;
     }
 
+    /// Mount a fixture file from tests/fixtures/status/<cluster>/ on the given API path.
+    pub async fn mount_status_fixture(
+        &self,
+        profile: &str,
+        cluster_dir: &str,
+        fixture_file: &str,
+        api_path: &str,
+    ) {
+        let (_, server) = self
+            .servers
+            .iter()
+            .find(|(n, _)| n == profile)
+            .unwrap_or_else(|| panic!("unknown profile: {}", profile));
+
+        let fixture_path = fixtures_dir()
+            .join("status")
+            .join(cluster_dir)
+            .join(format!("{}.json", fixture_file));
+        let body = std::fs::read_to_string(&fixture_path)
+            .unwrap_or_else(|_| panic!("failed to read fixture: {}", fixture_path.display()));
+
+        Mock::given(method("GET"))
+            .and(path(api_path))
+            .respond_with(ResponseTemplate::new(200).set_body_raw(body, "application/json"))
+            .mount(server)
+            .await;
+    }
+
     /// Mount standard cluster fixtures on a profile (settings, version, nodes, fs, activity).
     pub async fn mount_cluster_fixtures(&self, profile: &str) {
         for fixture in &[
@@ -261,6 +290,22 @@ base_url = "http://127.0.0.1:{port}"
             "analytics_activity",
         ] {
             self.mount_fixture(profile, fixture).await;
+        }
+    }
+
+    /// Mount cluster fixtures from the status fixture directory with capacity history.
+    /// Maps: (fixture_file_name, api_path)
+    pub async fn mount_cluster_fixtures_with_capacity(&self, profile: &str, cluster_dir: &str) {
+        let mappings: &[(&str, &str)] = &[
+            ("cluster_settings", "/v1/cluster/settings"),
+            ("version", "/v1/version"),
+            ("cluster_nodes", "/v1/cluster/nodes/"),
+            ("file_system", "/v1/file-system"),
+            ("capacity_history", "/v1/analytics/capacity-history/"),
+        ];
+        for (file, api) in mappings {
+            self.mount_status_fixture(profile, cluster_dir, file, api)
+                .await;
         }
     }
 

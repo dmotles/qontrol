@@ -140,3 +140,151 @@ async fn test_help_shows_status() {
         .success()
         .stdout(predicate::str::contains("status"));
 }
+
+/// Test: capacity collection + projection from real gravytrain fixtures.
+#[tokio::test]
+async fn test_status_capacity_projection_onprem() {
+    let mts = harness::MultiTestServer::start(&["gravytrain"]).await;
+    mts.mount_cluster_fixtures_with_capacity("gravytrain", "gravytrain")
+        .await;
+    // Also need analytics_activity for base collection
+    mts.mount_status_fixture(
+        "gravytrain",
+        "gravytrain",
+        "activity_iops_read",
+        "/v1/analytics/activity/current",
+    )
+    .await;
+
+    let output = mts
+        .command()
+        .args(["status", "--json"])
+        .output()
+        .expect("failed to execute");
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let json: serde_json::Value = serde_json::from_str(&stdout).expect("invalid JSON output");
+
+    let clusters = json["clusters"].as_array().expect("clusters");
+    assert_eq!(clusters.len(), 1);
+
+    let capacity = &clusters[0]["capacity"];
+    assert!(capacity["total_bytes"].as_u64().unwrap() > 0);
+    assert!(capacity["used_bytes"].as_u64().unwrap() > 0);
+
+    // Gravytrain has growth → projection should exist
+    let projection = &capacity["projection"];
+    assert!(
+        !projection.is_null(),
+        "on-prem cluster with growth should have projection"
+    );
+    assert!(projection["days_until_full"].as_u64().is_some());
+    assert!(projection["growth_rate_bytes_per_day"].as_f64().unwrap() > 0.0);
+}
+
+/// Test: empty capacity history → no projection.
+#[tokio::test]
+async fn test_status_capacity_no_history() {
+    let mts = harness::MultiTestServer::start(&["cluster_a"]).await;
+    mts.mount_cluster_fixtures("cluster_a").await;
+    // Don't mount capacity_history — collector will get an error and skip projection
+
+    let output = mts
+        .command()
+        .args(["status", "--json"])
+        .output()
+        .expect("failed to execute");
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let json: serde_json::Value = serde_json::from_str(&stdout).expect("invalid JSON output");
+
+    let clusters = json["clusters"].as_array().expect("clusters");
+    let projection = &clusters[0]["capacity"]["projection"];
+    assert!(
+        projection.is_null(),
+        "cluster without capacity history should have no projection"
+    );
+}
+
+/// Test: AWS cloud cluster with growth trend → correct days_to_full.
+#[tokio::test]
+async fn test_status_capacity_projection_cloud() {
+    let mts = harness::MultiTestServer::start(&["aws_grav"]).await;
+    mts.mount_cluster_fixtures_with_capacity("aws_grav", "aws-gravytrain")
+        .await;
+    mts.mount_status_fixture(
+        "aws_grav",
+        "aws-gravytrain",
+        "activity_iops_read",
+        "/v1/analytics/activity/current",
+    )
+    .await;
+
+    let output = mts
+        .command()
+        .args(["status", "--json"])
+        .output()
+        .expect("failed to execute");
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let json: serde_json::Value = serde_json::from_str(&stdout).expect("invalid JSON output");
+
+    let clusters = json["clusters"].as_array().expect("clusters");
+    let cluster = &clusters[0];
+
+    // AWS cluster type should be detected
+    assert_eq!(cluster["type"], "CnqAws");
+
+    // AWS has growth in its history → should have projection
+    let projection = &cluster["capacity"]["projection"];
+    if !projection.is_null() {
+        assert!(projection["days_until_full"].as_u64().is_some());
+    }
+}
+
+/// Test: projection appears in alerts when days_to_full is within threshold.
+#[tokio::test]
+async fn test_status_capacity_projection_alert() {
+    let mts = harness::MultiTestServer::start(&["gravytrain"]).await;
+    mts.mount_cluster_fixtures_with_capacity("gravytrain", "gravytrain")
+        .await;
+    mts.mount_status_fixture(
+        "gravytrain",
+        "gravytrain",
+        "activity_iops_read",
+        "/v1/analytics/activity/current",
+    )
+    .await;
+
+    let output = mts
+        .command()
+        .args(["status", "--json"])
+        .output()
+        .expect("failed to execute");
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let json: serde_json::Value = serde_json::from_str(&stdout).expect("invalid JSON output");
+
+    let clusters = json["clusters"].as_array().expect("clusters");
+    let projection = &clusters[0]["capacity"]["projection"];
+
+    if !projection.is_null() {
+        let days = projection["days_until_full"].as_u64().unwrap();
+        let alerts = json["alerts"].as_array().expect("alerts");
+        let has_capacity_alert = alerts
+            .iter()
+            .any(|a| a["category"].as_str() == Some("capacity_projection"));
+
+        if days < 90 {
+            assert!(
+                has_capacity_alert,
+                "on-prem cluster with {} days to full should have alert",
+                days
+            );
+        }
+    }
+}

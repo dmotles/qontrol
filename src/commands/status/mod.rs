@@ -1,4 +1,5 @@
 pub mod cache;
+pub mod capacity;
 pub mod collector;
 pub mod detection;
 pub mod types;
@@ -110,6 +111,14 @@ fn print_status(status: &EnvironmentStatus) {
             cluster.latency_ms,
             stale_marker,
         );
+
+        // Show capacity projection warning if applicable
+        if let Some(ref projection) = cluster.capacity.projection {
+            if capacity::should_warn(projection, &cluster.cluster_type) {
+                let msg = capacity::format_warning(projection, &cluster.cluster_type);
+                println!("    {} {}", yellow.apply_to("⚠"), msg);
+            }
+        }
     }
     println!();
 
