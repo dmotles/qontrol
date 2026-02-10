@@ -122,6 +122,18 @@ fn print_status(status: &EnvironmentStatus) {
     }
     println!();
 
+    // File/snapshot stats
+    if agg.files.total_files > 0 || agg.files.total_directories > 0 {
+        println!(
+            "  Files: {}  Dirs: {}  Snapshots: {} ({})",
+            format_number(agg.files.total_files),
+            format_number(agg.files.total_directories),
+            format_number(agg.files.total_snapshots),
+            format_bytes(agg.files.snapshot_bytes),
+        );
+        println!();
+    }
+
     // Aggregate capacity
     if agg.capacity.total_bytes > 0 {
         let pct = agg.capacity.used_pct;
@@ -143,6 +155,39 @@ fn print_status(status: &EnvironmentStatus) {
             green.apply_to(format_bytes(agg.capacity.free_bytes)),
         );
     }
+    println!();
+
+    // Per-cluster detail
+    for cluster in &status.clusters {
+        if !cluster.reachable {
+            continue;
+        }
+        let activity = &cluster.activity;
+        if activity.is_idle {
+            println!("  {} Activity: {}", dim.apply_to("·"), dim.apply_to("idle"));
+        } else {
+            println!(
+                "  {} Activity: R: {:.0} IOPS / {}/s  W: {:.0} IOPS / {}/s",
+                dim.apply_to("·"),
+                activity.iops_read,
+                format_bytes(activity.throughput_read as u64),
+                activity.iops_write,
+                format_bytes(activity.throughput_write as u64),
+            );
+        }
+    }
+}
+
+fn format_number(n: u64) -> String {
+    let s = n.to_string();
+    let mut result = String::new();
+    for (i, c) in s.chars().rev().enumerate() {
+        if i > 0 && i % 3 == 0 {
+            result.push(',');
+        }
+        result.push(c);
+    }
+    result.chars().rev().collect()
 }
 
 fn render_bar(pct: u64, width: usize) -> String {

@@ -180,6 +180,14 @@ impl QumuloClient {
         )
     }
 
+    pub fn get_activity_by_type(&self, activity_type: &str) -> Result<Value> {
+        self.request(
+            "GET",
+            &format!("/v1/analytics/activity/current?type={}", activity_type),
+            None,
+        )
+    }
+
     // Health endpoints
 
     pub fn get_cluster_slots(&self) -> Result<Value> {
@@ -212,6 +220,10 @@ impl QumuloClient {
 
     pub fn get_snapshots(&self) -> Result<Value> {
         self.request("GET", "/v2/snapshots/", None)
+    }
+
+    pub fn get_snapshots_total_capacity(&self) -> Result<Value> {
+        self.request("GET", "/v1/snapshots/total-used-capacity", None)
     }
 
     pub fn get_snapshot(&self, id: u64) -> Result<Value> {

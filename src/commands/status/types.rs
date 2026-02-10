@@ -118,6 +118,7 @@ pub struct ActivityStatus {
     pub throughput_read: f64,
     pub throughput_write: f64,
     pub connections: usize,
+    pub is_idle: bool,
 }
 
 /// File system statistics.
@@ -125,6 +126,8 @@ pub struct ActivityStatus {
 pub struct FileStats {
     pub total_files: u64,
     pub total_directories: u64,
+    pub total_snapshots: u64,
+    pub snapshot_bytes: u64,
 }
 
 /// Overall health status of a cluster.

@@ -267,35 +267,8 @@ base_url = "http://127.0.0.1:{port}"
             .await;
     }
 
-    /// Mount a fixture file from tests/fixtures/status/<cluster>/ on the given API path.
-    pub async fn mount_status_fixture(
-        &self,
-        profile: &str,
-        cluster_dir: &str,
-        fixture_file: &str,
-        api_path: &str,
-    ) {
-        let (_, server) = self
-            .servers
-            .iter()
-            .find(|(n, _)| n == profile)
-            .unwrap_or_else(|| panic!("unknown profile: {}", profile));
-
-        let fixture_path = fixtures_dir()
-            .join("status")
-            .join(cluster_dir)
-            .join(format!("{}.json", fixture_file));
-        let body = std::fs::read_to_string(&fixture_path)
-            .unwrap_or_else(|_| panic!("failed to read fixture: {}", fixture_path.display()));
-
-        Mock::given(method("GET"))
-            .and(path(api_path))
-            .respond_with(ResponseTemplate::new(200).set_body_raw(body, "application/json"))
-            .mount(server)
-            .await;
-    }
-
     /// Mount standard cluster fixtures on a profile (settings, version, nodes, fs, activity, health, network).
+    /// Uses base fixture files that return all activity types in one response.
     pub async fn mount_cluster_fixtures(&self, profile: &str) {
         for fixture in &[
             "cluster_settings",
@@ -312,6 +285,178 @@ base_url = "http://127.0.0.1:{port}"
         ] {
             self.mount_fixture(profile, fixture).await;
         }
+        // Mount stubs for new endpoints so existing tests don't break
+        self.mount_empty_response(profile, "GET", "/v1/files/%2F/recursive-aggregates/")
+            .await;
+        self.mount_empty_response(profile, "GET", "/v2/snapshots/")
+            .await;
+        self.mount_empty_response(profile, "GET", "/v1/snapshots/total-used-capacity")
+            .await;
+    }
+
+    /// Mount a fixture from the status/<cluster>/ directory onto a profile's mock server.
+    pub async fn mount_status_fixture(
+        &self,
+        profile: &str,
+        cluster: &str,
+        fixture_name: &str,
+        http_method: &str,
+        api_path: &str,
+    ) {
+        let (_, server) = self
+            .servers
+            .iter()
+            .find(|(n, _)| n == profile)
+            .unwrap_or_else(|| panic!("unknown profile: {}", profile));
+
+        let fixture_path = status_fixtures_dir()
+            .join(cluster)
+            .join(format!("{}.json", fixture_name));
+        let body = std::fs::read_to_string(&fixture_path)
+            .unwrap_or_else(|_| panic!("failed to read fixture: {}", fixture_path.display()));
+
+        Mock::given(method(http_method))
+            .and(path(api_path))
+            .respond_with(ResponseTemplate::new(200).set_body_raw(body, "application/json"))
+            .mount(server)
+            .await;
+    }
+
+    /// Mount a status fixture with a required query parameter.
+    pub async fn mount_status_fixture_with_query(
+        &self,
+        profile: &str,
+        cluster: &str,
+        fixture_name: &str,
+        http_method: &str,
+        api_path: &str,
+        query_key: &str,
+        query_value: &str,
+    ) {
+        let (_, server) = self
+            .servers
+            .iter()
+            .find(|(n, _)| n == profile)
+            .unwrap_or_else(|| panic!("unknown profile: {}", profile));
+
+        let fixture_path = status_fixtures_dir()
+            .join(cluster)
+            .join(format!("{}.json", fixture_name));
+        let body = std::fs::read_to_string(&fixture_path)
+            .unwrap_or_else(|_| panic!("failed to read fixture: {}", fixture_path.display()));
+
+        Mock::given(method(http_method))
+            .and(path(api_path))
+            .and(query_param(query_key, query_value))
+            .respond_with(ResponseTemplate::new(200).set_body_raw(body, "application/json"))
+            .mount(server)
+            .await;
+    }
+
+    /// Mount an empty JSON response (empty object) on a profile's mock server.
+    pub async fn mount_empty_response(&self, profile: &str, http_method: &str, api_path: &str) {
+        let (_, server) = self
+            .servers
+            .iter()
+            .find(|(n, _)| n == profile)
+            .unwrap_or_else(|| panic!("unknown profile: {}", profile));
+
+        Mock::given(method(http_method))
+            .and(path(api_path))
+            .respond_with(ResponseTemplate::new(200).set_body_raw("{}", "application/json"))
+            .mount(server)
+            .await;
+    }
+
+    /// Mount an error response on a profile's mock server.
+    pub async fn mount_profile_error(
+        &self,
+        profile: &str,
+        http_method: &str,
+        api_path: &str,
+        status_code: u16,
+    ) {
+        let (_, server) = self
+            .servers
+            .iter()
+            .find(|(n, _)| n == profile)
+            .unwrap_or_else(|| panic!("unknown profile: {}", profile));
+
+        Mock::given(method(http_method))
+            .and(path(api_path))
+            .respond_with(ResponseTemplate::new(status_code).set_body_raw(
+                serde_json::json!({"description": "error", "module": "test"}).to_string(),
+                "application/json",
+            ))
+            .mount(server)
+            .await;
+    }
+
+    /// Mount all status-specific fixtures for a real cluster from tests/fixtures/status/<cluster>/.
+    /// Mounts core endpoints plus per-type activity with query param matching.
+    pub async fn mount_full_status_fixtures(&self, profile: &str, cluster: &str) {
+        // Core cluster metadata
+        self.mount_status_fixture(
+            profile,
+            cluster,
+            "cluster_settings",
+            "GET",
+            "/v1/cluster/settings",
+        )
+        .await;
+        self.mount_status_fixture(profile, cluster, "version", "GET", "/v1/version")
+            .await;
+        self.mount_status_fixture(
+            profile,
+            cluster,
+            "cluster_nodes",
+            "GET",
+            "/v1/cluster/nodes/",
+        )
+        .await;
+        self.mount_status_fixture(profile, cluster, "file_system", "GET", "/v1/file-system")
+            .await;
+
+        // File stats
+        self.mount_status_fixture(
+            profile,
+            cluster,
+            "recursive_aggregates",
+            "GET",
+            "/v1/files/%2F/recursive-aggregates/",
+        )
+        .await;
+
+        // Snapshots
+        self.mount_status_fixture(profile, cluster, "snapshots_list", "GET", "/v2/snapshots/")
+            .await;
+        self.mount_status_fixture(
+            profile,
+            cluster,
+            "snapshots_total_capacity",
+            "GET",
+            "/v1/snapshots/total-used-capacity",
+        )
+        .await;
+
+        // Per-type activity with query param matching
+        for (fixture, type_name) in &[
+            ("activity_iops_read", "file-iops-read"),
+            ("activity_iops_write", "file-iops-write"),
+            ("activity_throughput_read", "file-throughput-read"),
+            ("activity_throughput_write", "file-throughput-write"),
+        ] {
+            self.mount_status_fixture_with_query(
+                profile,
+                cluster,
+                fixture,
+                "GET",
+                "/v1/analytics/activity/current",
+                "type",
+                type_name,
+            )
+            .await;
+        }
     }
 
     /// Mount cluster fixtures from the status fixture directory with capacity history.
@@ -325,7 +470,7 @@ base_url = "http://127.0.0.1:{port}"
             ("capacity_history", "/v1/analytics/capacity-history/"),
         ];
         for (file, api) in mappings {
-            self.mount_status_fixture(profile, cluster_dir, file, api)
+            self.mount_status_fixture(profile, cluster_dir, file, "GET", api)
                 .await;
         }
     }
@@ -450,4 +595,8 @@ fn fixtures_dir() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests")
         .join("fixtures")
+}
+
+fn status_fixtures_dir() -> PathBuf {
+    fixtures_dir().join("status")
 }
