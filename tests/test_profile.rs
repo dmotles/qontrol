@@ -109,3 +109,201 @@ async fn test_profile_add_with_token_and_options() {
         .stdout(predicate::str::contains("cluster.example.com:9000"))
         .stdout(predicate::str::contains("Insecure: true"));
 }
+
+// --- Interactive login flow tests (non-interactive via --username/--password) ---
+
+#[tokio::test]
+async fn test_profile_add_interactive_login() {
+    let ts = TestServer::start().await;
+    ts.mount_fixtures(&["session_login", "session_who_am_i", "access_token_create"])
+        .await;
+
+    let port = ts.mock_server.address().port().to_string();
+    ts.command()
+        .args([
+            "profile",
+            "add",
+            "testcluster",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            &port,
+            "--insecure",
+            "--username",
+            "admin",
+            "--password",
+            "testpass",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Logged in as admin"))
+        .stdout(predicate::str::contains("Profile 'testcluster' saved"));
+
+    // Verify the profile was created with the access token from the fixture
+    // Token is redacted in show output — last 8 chars of "access-v1:test-long-lived-token" are visible
+    ts.command()
+        .args(["profile", "show", "testcluster", "--json"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("ed-token"));
+}
+
+#[tokio::test]
+async fn test_profile_add_login_bad_password() {
+    let ts = TestServer::start().await;
+    ts.mount_error("POST", "/v1/session/login", 401).await;
+
+    let port = ts.mock_server.address().port().to_string();
+    ts.command()
+        .args([
+            "profile",
+            "add",
+            "bad",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            &port,
+            "--insecure",
+            "--username",
+            "admin",
+            "--password",
+            "wrong",
+        ])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("Invalid username or password"));
+}
+
+#[tokio::test]
+async fn test_profile_add_login_connection_refused() {
+    let temp = tempfile::TempDir::new().unwrap();
+
+    // Use a port with nothing listening (port 1 is almost never open)
+    Command::cargo_bin("qontrol")
+        .unwrap()
+        .env("QONTROL_CONFIG_DIR", temp.path())
+        .env("QONTROL_BASE_URL", "http://127.0.0.1:1")
+        .args([
+            "profile",
+            "add",
+            "bad",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            "1",
+            "--insecure",
+            "--username",
+            "admin",
+            "--password",
+            "test",
+        ])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("Could not connect"));
+}
+
+#[tokio::test]
+async fn test_profile_add_login_no_permission() {
+    let ts = TestServer::start().await;
+    ts.mount_fixtures(&["session_login", "session_who_am_i"])
+        .await;
+    ts.mount_error("POST", "/v1/auth/access-tokens/", 403).await;
+
+    let port = ts.mock_server.address().port().to_string();
+    ts.command()
+        .args([
+            "profile",
+            "add",
+            "noperm",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            &port,
+            "--insecure",
+            "--username",
+            "admin",
+            "--password",
+            "testpass",
+        ])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("permission"));
+}
+
+#[tokio::test]
+async fn test_profile_add_login_expiry_never() {
+    let ts = TestServer::start().await;
+    ts.mount_fixtures(&["session_login", "session_who_am_i", "access_token_create"])
+        .await;
+
+    let port = ts.mock_server.address().port().to_string();
+    ts.command()
+        .args([
+            "profile",
+            "add",
+            "neverexpire",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            &port,
+            "--insecure",
+            "--username",
+            "admin",
+            "--password",
+            "testpass",
+            "--expiry",
+            "never",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("never expires"));
+}
+
+#[tokio::test]
+async fn test_profile_add_login_expiry_6months() {
+    let ts = TestServer::start().await;
+    ts.mount_fixtures(&["session_login", "session_who_am_i", "access_token_create"])
+        .await;
+
+    let port = ts.mock_server.address().port().to_string();
+    ts.command()
+        .args([
+            "profile",
+            "add",
+            "sixmonths",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            &port,
+            "--insecure",
+            "--username",
+            "admin",
+            "--password",
+            "testpass",
+            "--expiry",
+            "6months",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("expires"));
+}
+
+#[test]
+fn test_profile_add_login_requires_host() {
+    let temp = tempfile::TempDir::new().unwrap();
+    Command::cargo_bin("qontrol")
+        .unwrap()
+        .env("QONTROL_CONFIG_DIR", temp.path())
+        .args([
+            "profile",
+            "add",
+            "test",
+            "--username",
+            "admin",
+            "--password",
+            "pass",
+        ])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("--host is required"));
+}

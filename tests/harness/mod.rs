@@ -122,6 +122,18 @@ insecure = true
         }
     }
 
+    /// Mount an error response for a given API path.
+    pub async fn mount_error(&self, http_method: &str, api_path: &str, status_code: u16) {
+        Mock::given(method(http_method))
+            .and(path(api_path))
+            .respond_with(ResponseTemplate::new(status_code).set_body_raw(
+                serde_json::json!({"description": "error", "module": "test"}).to_string(),
+                "application/json",
+            ))
+            .mount(&self.mock_server)
+            .await;
+    }
+
     /// Build an assert_cmd Command pre-configured with the test environment.
     #[allow(deprecated)]
     pub fn command(&self) -> Command {

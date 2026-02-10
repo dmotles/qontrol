@@ -92,6 +92,15 @@ pub enum ProfileCommands {
         /// Set as the default profile
         #[arg(long)]
         default: bool,
+        /// Username for non-interactive login (requires --password and --host)
+        #[arg(long, hide = true)]
+        username: Option<String>,
+        /// Password for non-interactive login (visible in process list; prefer interactive login)
+        #[arg(long, hide = true)]
+        password: Option<String>,
+        /// Access token expiry for non-interactive login: 6months, 1year, never (default: 1year)
+        #[arg(long, hide = true, default_value = "1year")]
+        expiry: String,
     },
     /// List all profiles
     List,

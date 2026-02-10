@@ -53,6 +53,9 @@ fn run(cli: Cli) -> Result<()> {
                 token,
                 insecure,
                 default,
+                username,
+                password,
+                expiry,
             } => {
                 if let Some(token) = token {
                     let host = host
@@ -66,6 +69,9 @@ fn run(cli: Cli) -> Result<()> {
                         insecure,
                         default,
                         cli.global_opts.timeout,
+                        username,
+                        password,
+                        &expiry,
                     )
                 }
             }

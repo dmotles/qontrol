@@ -44,10 +44,18 @@ pub fn add_interactive(
     cli_insecure: bool,
     default: bool,
     timeout: u64,
+    cli_username: Option<String>,
+    cli_password: Option<String>,
+    cli_expiry: &str,
 ) -> Result<()> {
+    let non_interactive = cli_username.is_some() && cli_password.is_some();
+
     let (host, port, insecure) = if let Some(h) = cli_host {
         (h, cli_port, cli_insecure)
     } else {
+        if non_interactive {
+            anyhow::bail!("--host is required when using --username and --password");
+        }
         let h: String = dialoguer::Input::new()
             .with_prompt("Cluster hostname")
             .interact_text()?;
@@ -62,35 +70,50 @@ pub fn add_interactive(
         (h, p, ins)
     };
 
-    let username: String = dialoguer::Input::new()
-        .with_prompt("Username")
-        .interact_text()?;
+    let username = if let Some(u) = cli_username {
+        u
+    } else {
+        dialoguer::Input::new()
+            .with_prompt("Username")
+            .interact_text()?
+    };
 
-    let password = rpassword::prompt_password("Password: ")?;
+    let password = if let Some(p) = cli_password {
+        p
+    } else {
+        rpassword::prompt_password("Password: ")?
+    };
 
     let (auth_id, session_token) =
         perform_login(&host, port, insecure, timeout, &username, &password)?;
 
     println!("Logged in as {} ({})", username, auth_id);
-    println!();
-    println!("To avoid storing your password, qontrol will create a long-lived API access");
-    println!("token on the cluster. This token will be stored in your local profile for");
-    println!("future CLI invocations.");
-    println!();
 
-    // Prompt for expiry
-    let expiry_items = ["6 months", "1 year", "Never (no expiration)"];
-    let expiry_selection = dialoguer::Select::new()
-        .with_prompt("Access token expiry")
-        .items(&expiry_items)
-        .default(1)
-        .interact()?;
+    if !non_interactive {
+        println!();
+        println!("To avoid storing your password, qontrol will create a long-lived API access");
+        println!("token on the cluster. This token will be stored in your local profile for");
+        println!("future CLI invocations.");
+        println!();
+    }
 
-    let expiration_time = match expiry_selection {
-        0 => Some(Utc::now() + chrono::Duration::days(182)),
-        1 => Some(Utc::now() + chrono::Duration::days(365)),
-        2 => None,
-        _ => unreachable!(),
+    let expiration_time = if non_interactive {
+        parse_expiry(cli_expiry)?
+    } else {
+        // Prompt for expiry
+        let expiry_items = ["6 months", "1 year", "Never (no expiration)"];
+        let expiry_selection = dialoguer::Select::new()
+            .with_prompt("Access token expiry")
+            .items(&expiry_items)
+            .default(1)
+            .interact()?;
+
+        match expiry_selection {
+            0 => Some(Utc::now() + chrono::Duration::days(182)),
+            1 => Some(Utc::now() + chrono::Duration::days(365)),
+            2 => None,
+            _ => unreachable!(),
+        }
     };
 
     let expiration_str = expiration_time.map(|dt| dt.format("%Y-%m-%dT%H:%M:%SZ").to_string());
@@ -300,6 +323,19 @@ pub fn show(name: Option<String>, config: &Config, json_mode: bool) -> Result<()
     }
 
     Ok(())
+}
+
+/// Parse an expiry string ("6months", "1year", "never") into an optional datetime.
+fn parse_expiry(expiry: &str) -> Result<Option<chrono::DateTime<Utc>>> {
+    match expiry {
+        "6months" => Ok(Some(Utc::now() + chrono::Duration::days(182))),
+        "1year" => Ok(Some(Utc::now() + chrono::Duration::days(365))),
+        "never" => Ok(None),
+        other => anyhow::bail!(
+            "invalid --expiry value '{}': expected 6months, 1year, or never",
+            other
+        ),
+    }
 }
 
 fn redact_token(token: &str) -> String {
