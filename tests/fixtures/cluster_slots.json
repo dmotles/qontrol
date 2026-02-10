@@ -1,0 +1,30 @@
+[
+  {
+    "capacity": "8001293385728",
+    "disk_model": "HGST_HUS728T8TALE6L4",
+    "disk_serial_number": "VRGGVJKK",
+    "disk_type": "HDD",
+    "drive_bay": "1",
+    "high_endurance": false,
+    "id": "1.1",
+    "node_id": 1,
+    "raw_capacity": "8001563222016",
+    "slot": 1,
+    "slot_type": "HDD",
+    "state": "healthy"
+  },
+  {
+    "capacity": "8001293385728",
+    "disk_model": "HGST_HUS728T8TALE6L4",
+    "disk_serial_number": "VRGH8J6K",
+    "disk_type": "HDD",
+    "drive_bay": "2",
+    "high_endurance": false,
+    "id": "1.2",
+    "node_id": 1,
+    "raw_capacity": "8001563222016",
+    "slot": 2,
+    "slot_type": "HDD",
+    "state": "healthy"
+  }
+]

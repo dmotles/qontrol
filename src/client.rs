@@ -180,6 +180,24 @@ impl QumuloClient {
         )
     }
 
+    // Health endpoints
+
+    pub fn get_cluster_slots(&self) -> Result<Value> {
+        self.request("GET", "/v1/cluster/slots/", None)
+    }
+
+    pub fn get_cluster_chassis(&self) -> Result<Value> {
+        self.request("GET", "/v1/cluster/nodes/chassis/", None)
+    }
+
+    pub fn get_cluster_protection_status(&self) -> Result<Value> {
+        self.request("GET", "/v1/cluster/protection/status", None)
+    }
+
+    pub fn get_cluster_restriper_status(&self) -> Result<Value> {
+        self.request("GET", "/v1/cluster/restriper/status", None)
+    }
+
     // Snapshot methods
 
     pub fn get_snapshots(&self) -> Result<Value> {

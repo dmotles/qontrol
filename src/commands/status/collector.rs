@@ -122,16 +122,60 @@ pub fn collect_all(
     // Build aggregates
     let aggregates = build_aggregates(&clusters);
 
-    // Add node health alerts
+    // Add health alerts from per-cluster data
     for cluster in &clusters {
         if cluster.nodes.online < cluster.nodes.total {
             let offline = cluster.nodes.total - cluster.nodes.online;
             alerts.push(Alert {
-                severity: AlertSeverity::Warning,
+                severity: AlertSeverity::Critical,
                 cluster: cluster.name.clone(),
                 message: format!("{} node(s) offline", offline),
-                category: "nodes".to_string(),
+                category: "node_offline".to_string(),
             });
+        }
+        if cluster.health.disks_unhealthy > 0 {
+            alerts.push(Alert {
+                severity: AlertSeverity::Warning,
+                cluster: cluster.name.clone(),
+                message: format!("{} disk(s) unhealthy", cluster.health.disks_unhealthy),
+                category: "disk_unhealthy".to_string(),
+            });
+        }
+        if cluster.health.psus_unhealthy > 0 {
+            alerts.push(Alert {
+                severity: AlertSeverity::Warning,
+                cluster: cluster.name.clone(),
+                message: format!("{} PSU(s) unhealthy", cluster.health.psus_unhealthy),
+                category: "psu_unhealthy".to_string(),
+            });
+        }
+        if cluster.health.data_at_risk {
+            alerts.push(Alert {
+                severity: AlertSeverity::Critical,
+                cluster: cluster.name.clone(),
+                message: "DATA AT RISK — restriper active".to_string(),
+                category: "data_at_risk".to_string(),
+            });
+        }
+        if let Some(remaining) = cluster.health.remaining_node_failures {
+            if remaining == 0 {
+                alerts.push(Alert {
+                    severity: AlertSeverity::Warning,
+                    cluster: cluster.name.clone(),
+                    message: "fault tolerance degraded (0 node failures remaining)".to_string(),
+                    category: "protection_degraded".to_string(),
+                });
+            }
+        }
+        if let Some(remaining) = cluster.health.remaining_drive_failures {
+            if remaining == 0 {
+                alerts.push(Alert {
+                    severity: AlertSeverity::Warning,
+                    cluster: cluster.name.clone(),
+                    message: "fault tolerance degraded (0 drive failures remaining)".to_string(),
+                    category: "protection_degraded".to_string(),
+                });
+            }
         }
     }
 
@@ -240,6 +284,13 @@ fn collect_cluster(profile: &str, entry: &ProfileEntry, timeout_secs: u64) -> Cl
         &cluster_type,
     );
 
+    // Fetch health data — each individually wrapped for error isolation
+    let (unhealthy_disks, disk_details) = fetch_disk_health(&client);
+    let (unhealthy_psus, psu_details) = fetch_psu_health(&client);
+    let (remaining_node_failures, remaining_drive_failures, protection_type) =
+        fetch_protection_status(&client);
+    let data_at_risk = fetch_restriper_status(&client);
+
     // Build health status
     let mut issues = Vec::new();
     if online_nodes < total_nodes {
@@ -252,7 +303,37 @@ fn collect_cluster(profile: &str, entry: &ProfileEntry, timeout_secs: u64) -> Cl
     if capacity.used_pct >= 90.0 {
         issues.push(format!("capacity at {:.0}%", capacity.used_pct));
     }
-    let health_level = if !issues.is_empty() && online_nodes == 0 {
+    if unhealthy_disks > 0 {
+        for d in &disk_details {
+            issues.push(format!(
+                "disk unhealthy: node {}, bay {}, {}",
+                d.node_id, d.bay, d.disk_type
+            ));
+        }
+    }
+    if unhealthy_psus > 0 {
+        for p in &psu_details {
+            issues.push(format!(
+                "PSU issue: node {}, {} ({})",
+                p.node_id, p.location, p.state
+            ));
+        }
+    }
+    if data_at_risk {
+        issues.push("DATA AT RISK — restriper active".to_string());
+    }
+    if let Some(remaining) = remaining_node_failures {
+        if remaining == 0 {
+            issues.push("fault tolerance degraded (0 node failures remaining)".to_string());
+        }
+    }
+    if let Some(remaining) = remaining_drive_failures {
+        if remaining == 0 {
+            issues.push("fault tolerance degraded (0 drive failures remaining)".to_string());
+        }
+    }
+
+    let health_level = if data_at_risk || (online_nodes == 0 && total_nodes > 0) {
         HealthLevel::Critical
     } else if !issues.is_empty() {
         HealthLevel::Degraded
@@ -279,6 +360,12 @@ fn collect_cluster(profile: &str, entry: &ProfileEntry, timeout_secs: u64) -> Cl
         health: HealthStatus {
             status: health_level,
             issues,
+            disks_unhealthy: unhealthy_disks,
+            psus_unhealthy: unhealthy_psus,
+            data_at_risk,
+            remaining_node_failures,
+            remaining_drive_failures,
+            protection_type,
         },
     };
 
@@ -384,6 +471,55 @@ fn aggregate_activity(entries: &[Value]) -> ActivityStatus {
     }
 }
 
+/// Fetch disk health from /v1/cluster/slots/.
+/// Returns (unhealthy_count, details).
+fn fetch_disk_health(client: &QumuloClient) -> (usize, Vec<UnhealthyDisk>) {
+    match client.get_cluster_slots() {
+        Ok(slots) => parse_disk_health(&slots),
+        Err(e) => {
+            tracing::warn!(error = %e, "failed to fetch disk health");
+            (0, Vec::new())
+        }
+    }
+}
+
+/// Fetch PSU health from /v1/cluster/nodes/chassis/.
+/// Cloud clusters return empty psu_statuses arrays — handled gracefully.
+/// Returns (unhealthy_count, details).
+fn fetch_psu_health(client: &QumuloClient) -> (usize, Vec<UnhealthyPsu>) {
+    match client.get_cluster_chassis() {
+        Ok(chassis) => parse_psu_health(&chassis),
+        Err(e) => {
+            tracing::warn!(error = %e, "failed to fetch PSU health");
+            (0, Vec::new())
+        }
+    }
+}
+
+/// Fetch protection status from /v1/cluster/protection/status.
+/// Returns (remaining_node_failures, remaining_drive_failures, protection_system_type).
+fn fetch_protection_status(client: &QumuloClient) -> (Option<u64>, Option<u64>, Option<String>) {
+    match client.get_cluster_protection_status() {
+        Ok(prot) => parse_protection_status(&prot),
+        Err(e) => {
+            tracing::warn!(error = %e, "failed to fetch protection status");
+            (None, None, None)
+        }
+    }
+}
+
+/// Fetch restriper status from /v1/cluster/restriper/status.
+/// Returns true if data_at_risk is true.
+fn fetch_restriper_status(client: &QumuloClient) -> bool {
+    match client.get_cluster_restriper_status() {
+        Ok(restriper) => parse_restriper_status(&restriper),
+        Err(e) => {
+            tracing::warn!(error = %e, "failed to fetch restriper status");
+            false
+        }
+    }
+}
+
 fn parse_byte_value(val: &Value) -> u64 {
     match val {
         Value::String(s) => s.parse::<u64>().unwrap_or(0),
@@ -421,5 +557,225 @@ fn build_aggregates(clusters: &[ClusterStatus]) -> Aggregates {
         online_nodes,
         capacity: cap,
         files,
+    }
+}
+
+/// Parse disk health from a slots JSON array.
+fn parse_disk_health(slots: &Value) -> (usize, Vec<UnhealthyDisk>) {
+    let mut unhealthy = Vec::new();
+    if let Some(arr) = slots.as_array() {
+        for slot in arr {
+            let state = slot["state"].as_str().unwrap_or("unknown");
+            if !state.eq_ignore_ascii_case("healthy") {
+                unhealthy.push(UnhealthyDisk {
+                    node_id: slot["node_id"].as_u64().unwrap_or(0),
+                    bay: slot["drive_bay"].as_str().unwrap_or("").to_string(),
+                    disk_type: slot["disk_type"].as_str().unwrap_or("unknown").to_string(),
+                    state: state.to_string(),
+                });
+            }
+        }
+    }
+    let count = unhealthy.len();
+    (count, unhealthy)
+}
+
+/// Parse PSU health from a chassis JSON array.
+fn parse_psu_health(chassis: &Value) -> (usize, Vec<UnhealthyPsu>) {
+    let mut unhealthy = Vec::new();
+    if let Some(nodes) = chassis.as_array() {
+        for node in nodes {
+            let node_id = node["id"].as_u64().unwrap_or(0);
+            if let Some(psus) = node["psu_statuses"].as_array() {
+                for psu in psus {
+                    let state = psu["state"].as_str().unwrap_or("unknown");
+                    if !state.eq_ignore_ascii_case("GOOD") {
+                        unhealthy.push(UnhealthyPsu {
+                            node_id,
+                            location: psu["location"].as_str().unwrap_or("unknown").to_string(),
+                            name: psu["name"].as_str().unwrap_or("unknown").to_string(),
+                            state: state.to_string(),
+                        });
+                    }
+                }
+            }
+        }
+    }
+    let count = unhealthy.len();
+    (count, unhealthy)
+}
+
+/// Parse protection status from a protection JSON object.
+fn parse_protection_status(prot: &Value) -> (Option<u64>, Option<u64>, Option<String>) {
+    let remaining_node = prot["remaining_node_failures"].as_u64();
+    let remaining_drive = prot["remaining_drive_failures"].as_u64();
+    let prot_type = prot["protection_system_type"]
+        .as_str()
+        .map(|s| s.to_string());
+    (remaining_node, remaining_drive, prot_type)
+}
+
+/// Parse restriper status from a restriper JSON object.
+fn parse_restriper_status(restriper: &Value) -> bool {
+    restriper["data_at_risk"].as_bool().unwrap_or(false)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn test_parse_disk_health_all_healthy() {
+        let slots = json!([
+            {"id": "1.1", "node_id": 1, "drive_bay": "1", "disk_type": "HDD", "state": "healthy"},
+            {"id": "1.2", "node_id": 1, "drive_bay": "2", "disk_type": "SSD", "state": "healthy"}
+        ]);
+        let (count, details) = parse_disk_health(&slots);
+        assert_eq!(count, 0);
+        assert!(details.is_empty());
+    }
+
+    #[test]
+    fn test_parse_disk_health_with_unhealthy() {
+        let slots = json!([
+            {"id": "1.1", "node_id": 1, "drive_bay": "1", "disk_type": "HDD", "state": "healthy"},
+            {"id": "1.2", "node_id": 1, "drive_bay": "2", "disk_type": "HDD", "state": "unhealthy"},
+            {"id": "2.1", "node_id": 2, "drive_bay": "1", "disk_type": "SSD", "state": "missing"}
+        ]);
+        let (count, details) = parse_disk_health(&slots);
+        assert_eq!(count, 2);
+        assert_eq!(details[0].node_id, 1);
+        assert_eq!(details[0].bay, "2");
+        assert_eq!(details[0].disk_type, "HDD");
+        assert_eq!(details[0].state, "unhealthy");
+        assert_eq!(details[1].node_id, 2);
+        assert_eq!(details[1].state, "missing");
+    }
+
+    #[test]
+    fn test_parse_disk_health_empty_array() {
+        let slots = json!([]);
+        let (count, details) = parse_disk_health(&slots);
+        assert_eq!(count, 0);
+        assert!(details.is_empty());
+    }
+
+    #[test]
+    fn test_parse_psu_health_all_good() {
+        let chassis = json!([
+            {
+                "id": 1,
+                "psu_statuses": [
+                    {"location": "left", "name": "PSU1", "state": "GOOD"},
+                    {"location": "right", "name": "PSU2", "state": "GOOD"}
+                ]
+            }
+        ]);
+        let (count, details) = parse_psu_health(&chassis);
+        assert_eq!(count, 0);
+        assert!(details.is_empty());
+    }
+
+    #[test]
+    fn test_parse_psu_health_with_failed() {
+        let chassis = json!([
+            {
+                "id": 1,
+                "psu_statuses": [
+                    {"location": "left", "name": "PSU1", "state": "GOOD"},
+                    {"location": "right", "name": "PSU2", "state": "FAILED"}
+                ]
+            },
+            {
+                "id": 2,
+                "psu_statuses": [
+                    {"location": "left", "name": "PSU1", "state": "DEGRADED"}
+                ]
+            }
+        ]);
+        let (count, details) = parse_psu_health(&chassis);
+        assert_eq!(count, 2);
+        assert_eq!(details[0].node_id, 1);
+        assert_eq!(details[0].location, "right");
+        assert_eq!(details[0].state, "FAILED");
+        assert_eq!(details[1].node_id, 2);
+        assert_eq!(details[1].state, "DEGRADED");
+    }
+
+    #[test]
+    fn test_parse_psu_health_cloud_empty_arrays() {
+        let chassis = json!([
+            {"id": 1, "psu_statuses": []},
+            {"id": 2, "psu_statuses": []},
+            {"id": 3, "psu_statuses": []}
+        ]);
+        let (count, details) = parse_psu_health(&chassis);
+        assert_eq!(count, 0);
+        assert!(details.is_empty());
+    }
+
+    #[test]
+    fn test_parse_protection_status_healthy() {
+        let prot = json!({
+            "protection_system_type": "PROTECTION_SYSTEM_TYPE_EC",
+            "remaining_node_failures": 1,
+            "remaining_drive_failures": 2
+        });
+        let (node, drive, ptype) = parse_protection_status(&prot);
+        assert_eq!(node, Some(1));
+        assert_eq!(drive, Some(2));
+        assert_eq!(ptype, Some("PROTECTION_SYSTEM_TYPE_EC".to_string()));
+    }
+
+    #[test]
+    fn test_parse_protection_status_degraded() {
+        let prot = json!({
+            "protection_system_type": "PROTECTION_SYSTEM_TYPE_EC",
+            "remaining_node_failures": 0,
+            "remaining_drive_failures": 0
+        });
+        let (node, drive, _) = parse_protection_status(&prot);
+        assert_eq!(node, Some(0));
+        assert_eq!(drive, Some(0));
+    }
+
+    #[test]
+    fn test_parse_protection_status_object_backed() {
+        let prot = json!({
+            "protection_system_type": "PROTECTION_SYSTEM_TYPE_OBJECT_BACKED",
+            "remaining_node_failures": 1,
+            "remaining_drive_failures": 1
+        });
+        let (_, _, ptype) = parse_protection_status(&prot);
+        assert_eq!(
+            ptype,
+            Some("PROTECTION_SYSTEM_TYPE_OBJECT_BACKED".to_string())
+        );
+    }
+
+    #[test]
+    fn test_parse_restriper_status_not_running() {
+        let restriper = json!({
+            "data_at_risk": false,
+            "status": "NOT_RUNNING"
+        });
+        assert!(!parse_restriper_status(&restriper));
+    }
+
+    #[test]
+    fn test_parse_restriper_status_data_at_risk() {
+        let restriper = json!({
+            "data_at_risk": true,
+            "status": "RUNNING",
+            "percent_complete": 20
+        });
+        assert!(parse_restriper_status(&restriper));
+    }
+
+    #[test]
+    fn test_parse_restriper_status_missing_field() {
+        let restriper = json!({"status": "NOT_RUNNING"});
+        assert!(!parse_restriper_status(&restriper));
     }
 }
