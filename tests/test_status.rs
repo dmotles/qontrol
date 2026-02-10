@@ -13,8 +13,8 @@ async fn test_status_two_clusters_healthy() {
         .arg("status")
         .assert()
         .success()
-        .stdout(predicate::str::contains("Environment:"))
-        .stdout(predicate::str::contains("2 clusters"));
+        .stdout(predicate::str::contains("Environment Overview"))
+        .stdout(predicate::str::contains("Clusters: 2"));
 }
 
 /// Test: JSON mode returns valid parseable JSON with cluster data.
@@ -105,7 +105,7 @@ async fn test_status_alias() {
         .arg("st")
         .assert()
         .success()
-        .stdout(predicate::str::contains("Environment:"));
+        .stdout(predicate::str::contains("Environment Overview"));
 }
 
 /// Test: cluster type detection shows up correctly in JSON output.

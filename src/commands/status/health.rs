@@ -164,7 +164,7 @@ fn check_capacity_projection(cluster: &ClusterStatus, alerts: &mut Vec<Alert>) {
 }
 
 /// Sort alerts by severity: Critical (0) > Warning (1) > Info (2).
-fn sort_alerts(alerts: &mut Vec<Alert>) {
+fn sort_alerts(alerts: &mut [Alert]) {
     alerts.sort_by_key(|a| match a.severity {
         AlertSeverity::Critical => 0,
         AlertSeverity::Warning => 1,
@@ -217,7 +217,10 @@ mod tests {
     fn test_healthy_cluster_no_alerts() {
         let cluster = make_cluster("healthy");
         let alerts = generate_alerts(&[cluster], vec![]);
-        assert!(alerts.is_empty(), "healthy cluster should produce no alerts");
+        assert!(
+            alerts.is_empty(),
+            "healthy cluster should produce no alerts"
+        );
     }
 
     // ── Node offline alerts ─────────────────────────────────────────
@@ -466,9 +469,7 @@ mod tests {
         cluster.health.remaining_drive_failures = Some(2);
 
         let alerts = generate_alerts(&[cluster], vec![]);
-        assert!(!alerts
-            .iter()
-            .any(|a| a.category == "protection_degraded"));
+        assert!(!alerts.iter().any(|a| a.category == "protection_degraded"));
     }
 
     #[test]
@@ -478,9 +479,7 @@ mod tests {
         cluster.health.remaining_drive_failures = None;
 
         let alerts = generate_alerts(&[cluster], vec![]);
-        assert!(!alerts
-            .iter()
-            .any(|a| a.category == "protection_degraded"));
+        assert!(!alerts.iter().any(|a| a.category == "protection_degraded"));
     }
 
     // ── Capacity projection alerts ──────────────────────────────────
@@ -495,9 +494,7 @@ mod tests {
         });
 
         let alerts = generate_alerts(&[cluster], vec![]);
-        let cap_alert = alerts
-            .iter()
-            .find(|a| a.category == "capacity_projection");
+        let cap_alert = alerts.iter().find(|a| a.category == "capacity_projection");
         assert!(cap_alert.is_some());
         assert_eq!(cap_alert.unwrap().severity, AlertSeverity::Warning);
     }
@@ -512,9 +509,7 @@ mod tests {
         });
 
         let alerts = generate_alerts(&[cluster], vec![]);
-        assert!(!alerts
-            .iter()
-            .any(|a| a.category == "capacity_projection"));
+        assert!(!alerts.iter().any(|a| a.category == "capacity_projection"));
     }
 
     #[test]
@@ -528,9 +523,7 @@ mod tests {
         });
 
         let alerts = generate_alerts(&[cluster], vec![]);
-        let cap_alert = alerts
-            .iter()
-            .find(|a| a.category == "capacity_projection");
+        let cap_alert = alerts.iter().find(|a| a.category == "capacity_projection");
         assert!(cap_alert.is_some());
     }
 
@@ -545,18 +538,14 @@ mod tests {
         });
 
         let alerts = generate_alerts(&[cluster], vec![]);
-        assert!(!alerts
-            .iter()
-            .any(|a| a.category == "capacity_projection"));
+        assert!(!alerts.iter().any(|a| a.category == "capacity_projection"));
     }
 
     #[test]
     fn test_no_projection_no_alert() {
         let cluster = make_cluster("test");
         let alerts = generate_alerts(&[cluster], vec![]);
-        assert!(!alerts
-            .iter()
-            .any(|a| a.category == "capacity_projection"));
+        assert!(!alerts.iter().any(|a| a.category == "capacity_projection"));
     }
 
     // ── Connectivity alerts pass-through ────────────────────────────
