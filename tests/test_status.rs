@@ -730,3 +730,151 @@ async fn test_status_unhealthy_psu_alert() {
     assert!(psu_alert.is_some(), "should have psu_unhealthy alert");
     assert_eq!(psu_alert.unwrap()["severity"], "warning");
 }
+
+// ── Network data collection tests ─────────────────────────────────────────────
+
+/// Test: JSON output includes per-node network details (connections + NIC stats).
+#[tokio::test]
+async fn test_status_json_includes_node_network_details() {
+    let mts = harness::MultiTestServer::start(&["net_cluster"]).await;
+    mts.mount_cluster_fixtures("net_cluster").await;
+
+    let output = mts
+        .command()
+        .args(["status", "--json"])
+        .output()
+        .expect("failed to execute");
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let json: serde_json::Value = serde_json::from_str(&stdout).expect("invalid JSON output");
+
+    let clusters = json["clusters"].as_array().expect("clusters");
+    assert_eq!(clusters.len(), 1);
+
+    let nodes = &clusters[0]["nodes"];
+    assert!(nodes["total"].as_u64().unwrap() > 0);
+
+    // Should have per-node details
+    let details = nodes["details"].as_array().expect("node details array");
+    assert!(!details.is_empty(), "should have node network details");
+
+    // Each node should have connection count and breakdown
+    for detail in details {
+        assert!(detail.get("node_id").is_some());
+        assert!(detail.get("connections").is_some());
+        assert!(detail.get("connection_breakdown").is_some());
+    }
+}
+
+/// Test: network connections 403 doesn't fail the whole cluster.
+#[tokio::test]
+async fn test_status_network_connections_403_graceful() {
+    let mts = harness::MultiTestServer::start(&["partial"]).await;
+    // Mount core fixtures but error on network connections
+    for fixture in &[
+        "cluster_settings",
+        "version",
+        "cluster_nodes",
+        "filesystem",
+        "analytics_activity",
+        "network_status",
+    ] {
+        mts.mount_fixture("partial", fixture).await;
+    }
+    mts.mount_error("partial", "GET", "/v2/network/connections/", 403)
+        .await;
+
+    let output = mts
+        .command()
+        .args(["status", "--json"])
+        .output()
+        .expect("failed to execute");
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let json: serde_json::Value = serde_json::from_str(&stdout).expect("invalid JSON output");
+
+    // Cluster should still be reachable despite connections 403
+    assert_eq!(json["aggregates"]["reachable_count"], 1);
+}
+
+/// Test: network status 403 doesn't fail the whole cluster.
+#[tokio::test]
+async fn test_status_network_status_403_graceful() {
+    let mts = harness::MultiTestServer::start(&["partial"]).await;
+    for fixture in &[
+        "cluster_settings",
+        "version",
+        "cluster_nodes",
+        "filesystem",
+        "analytics_activity",
+        "network_connections",
+    ] {
+        mts.mount_fixture("partial", fixture).await;
+    }
+    mts.mount_error("partial", "GET", "/v3/network/status", 403)
+        .await;
+
+    let output = mts
+        .command()
+        .args(["status", "--json"])
+        .output()
+        .expect("failed to execute");
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let json: serde_json::Value = serde_json::from_str(&stdout).expect("invalid JSON output");
+
+    assert_eq!(json["aggregates"]["reachable_count"], 1);
+    // Should still have node details (from connections), just no NIC data
+    let details = json["clusters"][0]["nodes"]["details"]
+        .as_array()
+        .expect("details");
+    assert!(!details.is_empty());
+}
+
+/// Test: on-prem cluster has link speed in node details.
+#[tokio::test]
+async fn test_status_onprem_has_link_speed() {
+    let mts = harness::MultiTestServer::start(&["onprem"]).await;
+    // Use gravytrain fixtures (on-prem model_numbers + speed "200000")
+    let subdir = "status/gravytrain";
+    mts.mount_fixture_from("onprem", "cluster_settings", subdir)
+        .await;
+    mts.mount_fixture_from("onprem", "version", subdir).await;
+    mts.mount_fixture_from("onprem", "cluster_nodes", subdir)
+        .await;
+    mts.mount_fixture_from("onprem", "network_connections", subdir)
+        .await;
+    mts.mount_fixture_from("onprem", "network_status", subdir)
+        .await;
+    // Mount shared fixtures for the ones not in gravytrain subdir
+    mts.mount_fixture("onprem", "filesystem").await;
+    mts.mount_fixture("onprem", "analytics_activity").await;
+
+    let output = mts
+        .command()
+        .args(["status", "--json"])
+        .output()
+        .expect("failed to execute");
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let json: serde_json::Value = serde_json::from_str(&stdout).expect("invalid JSON output");
+
+    let details = json["clusters"][0]["nodes"]["details"]
+        .as_array()
+        .expect("details");
+    assert!(!details.is_empty());
+    // Fixture has on-prem nodes with speed "200000" = 200 Gbps
+    for detail in details {
+        let link = detail["nic_link_speed_bps"].as_u64();
+        assert!(
+            link.is_some(),
+            "on-prem nodes should have link speed, got: {:?}",
+            detail
+        );
+        assert_eq!(link.unwrap(), 200_000_000_000);
+    }
+}

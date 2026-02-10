@@ -34,6 +34,8 @@ const FIXTURE_ROUTES: &[(&str, &str, &str)] = &[
         "/v1/analytics/activity/current",
     ),
     ("capacity_history", "GET", "/v1/analytics/capacity-history/"),
+    ("network_connections", "GET", "/v2/network/connections/"),
+    ("network_status", "GET", "/v3/network/status"),
     ("fs_entries_root", "GET", "/v1/files/%2F/entries/"),
     ("fs_entries_home", "GET", "/v1/files/%2Fhome/entries/"),
     ("fs_attributes_root", "GET", "/v1/files/%2F/info/attributes"),
@@ -293,7 +295,7 @@ base_url = "http://127.0.0.1:{port}"
             .await;
     }
 
-    /// Mount standard cluster fixtures on a profile (settings, version, nodes, fs, activity, health).
+    /// Mount standard cluster fixtures on a profile (settings, version, nodes, fs, activity, health, network).
     pub async fn mount_cluster_fixtures(&self, profile: &str) {
         for fixture in &[
             "cluster_settings",
@@ -305,6 +307,8 @@ base_url = "http://127.0.0.1:{port}"
             "cluster_chassis",
             "cluster_protection_status",
             "cluster_restriper_status",
+            "network_connections",
+            "network_status",
         ] {
             self.mount_fixture(profile, fixture).await;
         }
@@ -324,6 +328,32 @@ base_url = "http://127.0.0.1:{port}"
             self.mount_status_fixture(profile, cluster_dir, file, api)
                 .await;
         }
+    }
+
+    /// Mount a fixture from a specific subdirectory on a profile's mock server.
+    /// E.g., mount_fixture_from("myprofile", "cluster_settings", "status/gravytrain")
+    /// loads tests/fixtures/status/gravytrain/cluster_settings.json
+    pub async fn mount_fixture_from(&self, profile: &str, name: &str, subdir: &str) {
+        let (_, server) = self
+            .servers
+            .iter()
+            .find(|(n, _)| n == profile)
+            .unwrap_or_else(|| panic!("unknown profile: {}", profile));
+
+        let (_, http_method, api_path) = FIXTURE_ROUTES
+            .iter()
+            .find(|(n, _, _)| *n == name)
+            .unwrap_or_else(|| panic!("unknown fixture: {}", name));
+
+        let fixture_path = fixtures_dir().join(subdir).join(format!("{}.json", name));
+        let body = std::fs::read_to_string(&fixture_path)
+            .unwrap_or_else(|_| panic!("failed to read fixture: {}", fixture_path.display()));
+
+        Mock::given(method(*http_method))
+            .and(path(*api_path))
+            .respond_with(ResponseTemplate::new(200).set_body_raw(body, "application/json"))
+            .mount(server)
+            .await;
     }
 
     /// Mount an error response on a specific profile's mock server.
