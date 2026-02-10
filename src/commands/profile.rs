@@ -22,6 +22,7 @@ pub fn add(
             port,
             token,
             insecure,
+            base_url: None,
         },
     );
 
@@ -140,6 +141,7 @@ pub fn add_interactive(
             port,
             token: access_token,
             insecure,
+            base_url: None,
         },
     );
 

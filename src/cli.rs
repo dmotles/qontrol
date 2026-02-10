@@ -69,6 +69,22 @@ pub enum Commands {
         #[command(subcommand)]
         command: FsCommands,
     },
+    /// Multi-cluster environment status
+    #[command(alias = "st")]
+    Status {
+        /// Continuously refresh the status view
+        #[arg(long)]
+        watch: bool,
+        /// Refresh interval in seconds (used with --watch)
+        #[arg(long, default_value = "2")]
+        interval: u64,
+        /// Filter to specific profiles (repeatable)
+        #[arg(long = "cluster", short = 'c', num_args = 1)]
+        profiles: Vec<String>,
+        /// Skip cache reads and writes
+        #[arg(long)]
+        no_cache: bool,
+    },
 }
 
 #[derive(Subcommand)]
