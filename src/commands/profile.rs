@@ -37,6 +37,7 @@ pub fn add(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn add_interactive(
     name: String,
     cli_host: Option<String>,

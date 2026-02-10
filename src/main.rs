@@ -144,14 +144,7 @@ fn run(cli: Cli) -> Result<()> {
                     long,
                     sort,
                     limit,
-                } => commands::fs::ls(
-                    &client,
-                    &path,
-                    long,
-                    &sort,
-                    limit,
-                    cli.global_opts.json,
-                ),
+                } => commands::fs::ls(&client, &path, long, &sort, limit, cli.global_opts.json),
                 FsCommands::Tree { path, max_depth } => {
                     commands::fs::tree(&client, &path, max_depth, cli.global_opts.json)
                 }

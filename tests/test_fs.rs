@@ -78,10 +78,7 @@ async fn test_fs_ls_pagination_json() {
     let files = json["files"].as_array().expect("files should be array");
     assert_eq!(files.len(), 3, "should have all 3 entries from both pages");
 
-    let names: Vec<&str> = files
-        .iter()
-        .map(|f| f["name"].as_str().unwrap())
-        .collect();
+    let names: Vec<&str> = files.iter().map(|f| f["name"].as_str().unwrap()).collect();
     assert!(names.contains(&"home"));
     assert!(names.contains(&"etc"));
     assert!(names.contains(&"var"));

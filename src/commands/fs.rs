@@ -29,7 +29,7 @@ pub fn ls(
     loop {
         let page_limit = remaining_limit.map(|l| {
             let fetched = total_count as u32;
-            if l > fetched { l - fetched } else { 0 }
+            l.saturating_sub(fetched)
         });
 
         // If we've already hit the limit, stop
@@ -115,7 +115,7 @@ fn ls_json(client: &QumuloClient, path: &str, limit: Option<u32>) -> Result<()> 
     loop {
         let page_limit = limit.map(|l| {
             let fetched = all_files.len() as u32;
-            if l > fetched { l - fetched } else { 0 }
+            l.saturating_sub(fetched)
         });
 
         if let Some(0) = page_limit {
