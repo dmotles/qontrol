@@ -1628,3 +1628,145 @@ async fn test_e2e_dashboard_alias_full_pipeline() {
     assert_eq!(json["aggregates"]["cluster_count"], 2);
     assert!(json["clusters"].as_array().unwrap().len() >= 2);
 }
+
+/// Test: --timing flag is accepted and produces timing output on stderr.
+#[tokio::test]
+async fn test_status_timing_flag_produces_stderr_output() {
+    let mts = harness::MultiTestServer::start(&["cluster_a"]).await;
+    mts.mount_cluster_fixtures("cluster_a").await;
+
+    let output = mts
+        .command()
+        .args(["status", "--timing", "--no-cache"])
+        .output()
+        .expect("failed to execute");
+
+    assert!(output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("API Call Timing"),
+        "stderr should contain timing header, got: {}",
+        stderr
+    );
+    assert!(
+        stderr.contains("Cluster totals"),
+        "stderr should contain cluster totals, got: {}",
+        stderr
+    );
+    assert!(
+        stderr.contains("ms"),
+        "stderr should contain millisecond durations"
+    );
+}
+
+/// Test: --timing flag does NOT interfere with --json stdout.
+#[tokio::test]
+async fn test_status_timing_with_json_mode() {
+    let mts = harness::MultiTestServer::start(&["cluster_a"]).await;
+    mts.mount_cluster_fixtures("cluster_a").await;
+
+    let output = mts
+        .command()
+        .args(["status", "--timing", "--json", "--no-cache"])
+        .output()
+        .expect("failed to execute");
+
+    assert!(output.status.success());
+
+    // stdout should be valid JSON (timing doesn't pollute it)
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let json: serde_json::Value = serde_json::from_str(&stdout).expect("--timing should not break JSON stdout");
+    assert!(json.get("clusters").is_some());
+
+    // stderr should have timing data
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("API Call Timing"),
+        "stderr should contain timing output when --timing is set"
+    );
+}
+
+/// Test: timing output NOT emitted when --timing is absent.
+#[tokio::test]
+async fn test_status_no_timing_without_flag() {
+    let mts = harness::MultiTestServer::start(&["cluster_a"]).await;
+    mts.mount_cluster_fixtures("cluster_a").await;
+
+    let output = mts
+        .command()
+        .args(["status", "--json", "--no-cache"])
+        .output()
+        .expect("failed to execute");
+
+    assert!(output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        !stderr.contains("API Call Timing"),
+        "timing output should NOT appear without --timing flag"
+    );
+}
+
+/// Test: --timing with multiple clusters shows per-cluster breakdown.
+#[tokio::test]
+async fn test_status_timing_multi_cluster() {
+    let mts = harness::MultiTestServer::start(&["cluster_a", "cluster_b"]).await;
+    mts.mount_cluster_fixtures("cluster_a").await;
+    mts.mount_cluster_fixtures("cluster_b").await;
+
+    let output = mts
+        .command()
+        .args(["status", "--timing", "--no-cache"])
+        .output()
+        .expect("failed to execute");
+
+    assert!(output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    // Both clusters should appear in timing output
+    assert!(
+        stderr.contains("cluster_a"),
+        "timing should include cluster_a"
+    );
+    assert!(
+        stderr.contains("cluster_b"),
+        "timing should include cluster_b"
+    );
+
+    // Should have known API call names
+    assert!(
+        stderr.contains("get_version"),
+        "timing should include get_version call"
+    );
+    assert!(
+        stderr.contains("get_cluster_settings"),
+        "timing should include get_cluster_settings call"
+    );
+}
+
+/// Test: --timing with an unreachable cluster shows partial timing.
+#[tokio::test]
+async fn test_status_timing_unreachable_cluster() {
+    let mts = harness::MultiTestServer::start(&["healthy", "broken"]).await;
+    mts.mount_cluster_fixtures("healthy").await;
+    // Don't mount anything on "broken"
+
+    let output = mts
+        .command()
+        .args(["status", "--timing", "--no-cache"])
+        .output()
+        .expect("failed to execute");
+
+    assert!(output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    // Healthy cluster should have timing
+    assert!(
+        stderr.contains("healthy"),
+        "timing should include healthy cluster"
+    );
+    // Broken cluster should have wall clock entry (even if partial)
+    assert!(
+        stderr.contains("broken"),
+        "timing should include broken cluster (partial timing up to failure)"
+    );
+}

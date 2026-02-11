@@ -75,6 +75,9 @@ pub enum Commands {
         /// Skip cache reads and writes
         #[arg(long)]
         no_cache: bool,
+        /// Show per-API-call timing breakdown (output to stderr)
+        #[arg(long)]
+        timing: bool,
     },
 }
 

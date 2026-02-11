@@ -133,6 +133,7 @@ fn run(cli: Cli) -> Result<()> {
             interval,
             profiles,
             no_cache,
+            timing,
         } => {
             let config = load_config()?;
             commands::status::run(
@@ -143,6 +144,7 @@ fn run(cli: Cli) -> Result<()> {
                 interval,
                 no_cache,
                 cli.global_opts.timeout,
+                timing,
             )
         }
         Commands::Fs { command } => {

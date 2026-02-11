@@ -12,6 +12,7 @@ use super::cache;
 use super::capacity;
 use super::detection::detect_cluster_type;
 use super::health;
+use super::timing::{ApiCallTiming, TimingReport};
 use super::types::*;
 
 /// Per-node NIC stats: (throughput_bps, link_speed_bps, utilization_pct, raw_bytes_total)
@@ -51,6 +52,7 @@ fn create_progress_spinners(
 /// When `watch_mode` is true, NIC stats use a single call (no 1-second sleep)
 /// and return raw byte counters for inter-poll delta computation.
 /// When `json_mode` is true (or stdout is not a TTY), progress spinners are suppressed.
+/// When `record_timing` is true, returns a TimingReport with per-API-call durations.
 pub fn collect_all(
     config: &Config,
     profile_filters: &[String],
@@ -58,7 +60,8 @@ pub fn collect_all(
     no_cache: bool,
     watch_mode: bool,
     json_mode: bool,
-) -> Result<EnvironmentStatus> {
+    record_timing: bool,
+) -> Result<(EnvironmentStatus, Option<TimingReport>)> {
     // Determine which profiles to query
     let profiles: Vec<(String, ProfileEntry)> = if profile_filters.is_empty() {
         config
@@ -86,7 +89,7 @@ pub fn collect_all(
     let progress = create_progress_spinners(&profiles, json_mode);
 
     // Spawn one thread per cluster for parallel collection
-    let results: Vec<ClusterResult> = std::thread::scope(|s| {
+    let results: Vec<(ClusterResult, Vec<ApiCallTiming>, u64)> = std::thread::scope(|s| {
         let handles: Vec<_> = profiles
             .iter()
             .enumerate()
@@ -100,7 +103,11 @@ pub fn collect_all(
                             pb.set_message(format!("{}  {}", name, msg));
                         }
                     };
-                    let result = collect_cluster(&name, &entry, timeout_secs, watch_mode, &on_progress);
+                    let wall_start = Instant::now();
+                    let (result, call_timings) = collect_cluster(
+                        &name, &entry, timeout_secs, watch_mode, &on_progress, record_timing,
+                    );
+                    let wall_ms = wall_start.elapsed().as_millis() as u64;
                     // Finish spinner based on result
                     if let Some(ref pb) = spinner {
                         match &result {
@@ -124,7 +131,7 @@ pub fn collect_all(
                             }
                         }
                     }
-                    result
+                    (result, call_timings, wall_ms)
                 })
             })
             .collect();
@@ -132,10 +139,14 @@ pub fn collect_all(
         handles
             .into_iter()
             .map(|h| {
-                h.join().unwrap_or_else(|_| ClusterResult::Unreachable {
-                    profile: "unknown".to_string(),
-                    error: "thread panicked".to_string(),
-                })
+                h.join().unwrap_or_else(|_| (
+                    ClusterResult::Unreachable {
+                        profile: "unknown".to_string(),
+                        error: "thread panicked".to_string(),
+                    },
+                    Vec::new(),
+                    0,
+                ))
             })
             .collect()
     });
@@ -145,11 +156,31 @@ pub fn collect_all(
         mp.clear().ok();
     }
 
+    // Collect timing data
+    let timing_report = if record_timing {
+        let mut all_api_calls = Vec::new();
+        let mut cluster_wall_clock = Vec::new();
+        for (result, call_timings, wall_ms) in &results {
+            all_api_calls.extend(call_timings.iter().cloned());
+            let profile_name = match result {
+                ClusterResult::Success { data, .. } => data.profile.clone(),
+                ClusterResult::Unreachable { profile, .. } => profile.clone(),
+            };
+            cluster_wall_clock.push((profile_name, *wall_ms));
+        }
+        Some(TimingReport {
+            api_calls: all_api_calls,
+            cluster_wall_clock,
+        })
+    } else {
+        None
+    };
+
     // Process results: successes go into clusters, failures try cache fallback
     let mut clusters = Vec::new();
     let mut connectivity_alerts = Vec::new();
 
-    for result in results {
+    for (result, _, _) in results {
         match result {
             ClusterResult::Success { data, .. } => {
                 let mut data = *data;
@@ -207,42 +238,71 @@ pub fn collect_all(
     // Generate prioritized, sorted alerts via the alerts engine
     let alerts = health::generate_alerts(&clusters, connectivity_alerts);
 
-    Ok(EnvironmentStatus {
-        aggregates,
-        alerts,
-        clusters,
-    })
+    Ok((
+        EnvironmentStatus {
+            aggregates,
+            alerts,
+            clusters,
+        },
+        timing_report,
+    ))
 }
 
-/// Collect status from a single cluster. Returns a ClusterResult.
+/// Collect status from a single cluster. Returns a ClusterResult and timing entries.
 /// The `on_progress` callback is invoked with a message describing the current API call.
+/// When `record_timing` is true, each API call group is timed and returned.
 fn collect_cluster(
     profile: &str,
     entry: &ProfileEntry,
     timeout_secs: u64,
     watch_mode: bool,
     on_progress: &dyn Fn(&str),
-) -> ClusterResult {
+    record_timing: bool,
+) -> (ClusterResult, Vec<ApiCallTiming>) {
+    let mut timings: Vec<ApiCallTiming> = Vec::new();
+    let profile_str = profile.to_string();
+
+    macro_rules! timed {
+        ($name:expr, $body:expr) => {{
+            let __start = Instant::now();
+            let __result = $body;
+            if record_timing {
+                timings.push(ApiCallTiming {
+                    cluster: profile_str.clone(),
+                    api_call: $name.to_string(),
+                    duration_ms: __start.elapsed().as_millis() as u64,
+                });
+            }
+            __result
+        }};
+    }
+
     on_progress("connecting...");
     let client = match QumuloClient::new(entry, timeout_secs) {
         Ok(c) => c,
         Err(e) => {
-            return ClusterResult::Unreachable {
-                profile: profile.to_string(),
-                error: format!("failed to create client: {}", e),
-            };
+            return (
+                ClusterResult::Unreachable {
+                    profile: profile.to_string(),
+                    error: format!("failed to create client: {}", e),
+                },
+                timings,
+            );
         }
     };
 
     // Fetch basic cluster data
     on_progress("fetching cluster settings...");
-    let settings = match client.get_cluster_settings() {
+    let settings = match timed!("get_cluster_settings", client.get_cluster_settings()) {
         Ok(v) => v,
         Err(e) => {
-            return ClusterResult::Unreachable {
-                profile: profile.to_string(),
-                error: format!("{}", e),
-            };
+            return (
+                ClusterResult::Unreachable {
+                    profile: profile.to_string(),
+                    error: format!("{}", e),
+                },
+                timings,
+            );
         }
     };
 
@@ -252,22 +312,35 @@ fn collect_cluster(
     let version = match client.get_version() {
         Ok(v) => v,
         Err(e) => {
-            return ClusterResult::Unreachable {
-                profile: profile.to_string(),
-                error: format!("{}", e),
-            };
+            return (
+                ClusterResult::Unreachable {
+                    profile: profile.to_string(),
+                    error: format!("{}", e),
+                },
+                timings,
+            );
         }
     };
     let latency_ms = start.elapsed().as_millis() as u64;
+    if record_timing {
+        timings.push(ApiCallTiming {
+            cluster: profile_str.clone(),
+            api_call: "get_version".to_string(),
+            duration_ms: latency_ms,
+        });
+    }
 
     on_progress("fetching nodes...");
-    let nodes_data = match client.get_cluster_nodes() {
+    let nodes_data = match timed!("get_cluster_nodes", client.get_cluster_nodes()) {
         Ok(v) => v,
         Err(e) => {
-            return ClusterResult::Unreachable {
-                profile: profile.to_string(),
-                error: format!("{}", e),
-            };
+            return (
+                ClusterResult::Unreachable {
+                    profile: profile.to_string(),
+                    error: format!("{}", e),
+                },
+                timings,
+            );
         }
     };
 
@@ -310,30 +383,31 @@ fn collect_cluster(
 
     // Fetch optional data — don't fail if these are unavailable
     on_progress("fetching capacity...");
-    let mut capacity = fetch_capacity(&client);
+    let mut capacity = timed!("get_file_system", fetch_capacity(&client));
     on_progress("fetching activity...");
-    let activity = fetch_activity(&client);
+    let activity = timed!("get_activity", fetch_activity(&client));
     on_progress("fetching file stats...");
-    let files = fetch_file_stats(&client);
+    let files = timed!("get_file_stats", fetch_file_stats(&client));
     on_progress("fetching network stats...");
-    let node_details = fetch_node_network_details(&client, &cluster_type, watch_mode);
+    let node_details = timed!(
+        "get_network_details",
+        fetch_node_network_details(&client, &cluster_type, watch_mode)
+    );
 
     // Fetch capacity history and compute projection
     on_progress("fetching capacity history...");
-    capacity.projection = fetch_capacity_projection(
-        &client,
-        capacity.used_bytes,
-        capacity.total_bytes,
-        &cluster_type,
+    capacity.projection = timed!(
+        "get_capacity_history",
+        fetch_capacity_projection(&client, capacity.used_bytes, capacity.total_bytes, &cluster_type)
     );
 
     // Fetch health data — each individually wrapped for error isolation
     on_progress("fetching health data...");
-    let (unhealthy_disks, disk_details) = fetch_disk_health(&client);
-    let (unhealthy_psus, psu_details) = fetch_psu_health(&client);
+    let (unhealthy_disks, disk_details) = timed!("get_cluster_slots", fetch_disk_health(&client));
+    let (unhealthy_psus, psu_details) = timed!("get_cluster_chassis", fetch_psu_health(&client));
     let (remaining_node_failures, remaining_drive_failures, protection_type) =
-        fetch_protection_status(&client);
-    let data_at_risk = fetch_restriper_status(&client);
+        timed!("get_protection_status", fetch_protection_status(&client));
+    let data_at_risk = timed!("get_restriper_status", fetch_restriper_status(&client));
 
     // Build health status
     let mut issues = Vec::new();
@@ -417,10 +491,13 @@ fn collect_cluster(
         },
     };
 
-    ClusterResult::Success {
-        data: Box::new(data),
-        latency_ms,
-    }
+    (
+        ClusterResult::Success {
+            data: Box::new(data),
+            latency_ms,
+        },
+        timings,
+    )
 }
 
 fn fetch_capacity_projection(

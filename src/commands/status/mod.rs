@@ -5,6 +5,7 @@ pub mod detection;
 pub mod health;
 pub mod json;
 pub mod renderer;
+pub mod timing;
 pub mod types;
 
 use std::collections::HashMap;
@@ -89,6 +90,7 @@ pub fn run(
     interval: u64,
     no_cache: bool,
     timeout_secs: u64,
+    show_timing: bool,
 ) -> Result<()> {
     // Set up Ctrl+C handler for graceful exit in watch mode
     let running = Arc::new(AtomicBool::new(true));
@@ -103,8 +105,8 @@ pub fn run(
     let mut watch_state: Option<WatchState> = None;
 
     loop {
-        let mut status = collector::collect_all(
-            config, profiles, timeout_secs, no_cache, watch, json_mode,
+        let (mut status, timing_report) = collector::collect_all(
+            config, profiles, timeout_secs, no_cache, watch, json_mode, show_timing,
         )?;
 
         // In watch mode, compute NIC throughput from deltas between polls
@@ -133,6 +135,11 @@ pub fn run(
             );
         } else {
             print!("{}", renderer::render(&status));
+        }
+
+        // Timing output goes to stderr so it doesn't interfere with --json stdout
+        if let Some(ref report) = timing_report {
+            timing::render_timing_report(report);
         }
 
         if !watch {
