@@ -10,9 +10,13 @@ build:
 release:
     cargo build --release
 
-# Run all tests
+# Run all tests (with coverage instrumentation)
 test:
-    cargo test
+    cargo llvm-cov
+
+# Generate LCOV coverage report
+coverage:
+    cargo llvm-cov --lcov --output-path lcov.info
 
 # Run clippy lints
 lint:
