@@ -8,7 +8,7 @@
 // ## How to write new tests
 // 1. Create a TestServer: `let ts = TestServer::start().await;`
 // 2. Mount needed fixtures: `ts.mount_fixture("cluster_settings").await;`
-// 3. Run the binary: `ts.command().args(["dashboard"]).assert().success();`
+// 3. Run the binary: `ts.command().args(["fleet", "status"]).assert().success();`
 //
 // ## How to refresh fixtures
 // Run the relevant API calls against a live cluster and save the JSON responses

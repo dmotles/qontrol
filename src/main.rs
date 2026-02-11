@@ -10,7 +10,8 @@ use clap::Parser;
 use tracing_subscriber::EnvFilter;
 
 use cli::{
-    ApiCommands, Cli, ClusterCommands, Commands, FsCommands, ProfileCommands, SnapshotCommands,
+    ApiCommands, Cli, ClusterCommands, Commands, FleetCommands, FsCommands, ProfileCommands,
+    SnapshotCommands,
 };
 use client::QumuloClient;
 use config::{load_config, resolve_profile};
@@ -128,25 +129,27 @@ fn run(cli: Cli) -> Result<()> {
                 }
             }
         }
-        Commands::Status {
-            watch,
-            interval,
-            profiles,
-            no_cache,
-            timing,
-        } => {
-            let config = load_config()?;
-            commands::status::run(
-                &config,
-                &profiles,
-                cli.global_opts.json,
+        Commands::Fleet { command } => match command {
+            FleetCommands::Status {
                 watch,
                 interval,
+                profiles,
                 no_cache,
-                cli.global_opts.timeout,
                 timing,
-            )
-        }
+            } => {
+                let config = load_config()?;
+                commands::status::run(
+                    &config,
+                    &profiles,
+                    cli.global_opts.json,
+                    watch,
+                    interval,
+                    no_cache,
+                    cli.global_opts.timeout,
+                    timing,
+                )
+            }
+        },
         Commands::Fs { command } => {
             let config = load_config()?;
             let (_, profile) = resolve_profile(&config, &cli.profile)?;

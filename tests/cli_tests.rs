@@ -64,11 +64,30 @@ fn test_profile_subcommands_help() {
 }
 
 #[test]
-fn test_dashboard_alias_shows_status_help() {
-    // `dashboard` is now an alias for `status`
+fn test_help_lists_fleet_command() {
     Command::cargo_bin("qontrol")
         .unwrap()
-        .args(["dashboard", "--help"])
+        .arg("--help")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("fleet"));
+}
+
+#[test]
+fn test_fleet_subcommands_help() {
+    Command::cargo_bin("qontrol")
+        .unwrap()
+        .args(["fleet", "--help"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("status"));
+}
+
+#[test]
+fn test_fleet_status_help() {
+    Command::cargo_bin("qontrol")
+        .unwrap()
+        .args(["fleet", "status", "--help"])
         .assert()
         .success()
         .stdout(predicate::str::contains("Multi-cluster environment status"))
@@ -77,26 +96,16 @@ fn test_dashboard_alias_shows_status_help() {
 }
 
 #[test]
-fn test_dashboard_alias_without_profile_shows_error() {
-    let temp = std::env::temp_dir().join("qontrol-test-dashboard-no-profile");
+fn test_fleet_status_without_profile_shows_error() {
+    let temp = std::env::temp_dir().join("qontrol-test-fleet-status-no-profile");
     Command::cargo_bin("qontrol")
         .unwrap()
         .env("HOME", &temp)
         .env("XDG_CONFIG_HOME", temp.join("config"))
-        .args(["dashboard"])
+        .args(["fleet", "status"])
         .assert()
         .failure()
         .stderr(predicate::str::contains("no matching profiles found"));
-}
-
-#[test]
-fn test_help_lists_status_command() {
-    Command::cargo_bin("qontrol")
-        .unwrap()
-        .arg("--help")
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("status"));
 }
 
 #[test]

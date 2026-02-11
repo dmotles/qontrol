@@ -60,8 +60,17 @@ pub enum Commands {
         #[command(subcommand)]
         command: FsCommands,
     },
+    /// Fleet-wide operations
+    Fleet {
+        #[command(subcommand)]
+        command: FleetCommands,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum FleetCommands {
     /// Multi-cluster environment status
-    #[command(alias = "st", alias = "dashboard")]
+    #[command(alias = "st")]
     Status {
         /// Continuously refresh the status view
         #[arg(long)]

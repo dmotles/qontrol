@@ -10,7 +10,7 @@ async fn test_status_two_clusters_healthy() {
     mts.mount_cluster_fixtures("cluster_b").await;
 
     mts.command()
-        .arg("status")
+        .args(["fleet", "status"])
         .assert()
         .success()
         .stdout(predicate::str::contains("Environment Overview"))
@@ -25,7 +25,7 @@ async fn test_status_json_output() {
 
     let output = mts
         .command()
-        .args(["status", "--json"])
+        .args(["fleet", "status", "--json"])
         .output()
         .expect("failed to execute");
 
@@ -49,7 +49,7 @@ async fn test_status_one_healthy_one_unreachable() {
 
     let output = mts
         .command()
-        .args(["status", "--json", "--no-cache"])
+        .args(["fleet", "status", "--json", "--no-cache"])
         .output()
         .expect("failed to execute");
 
@@ -78,7 +78,7 @@ async fn test_status_profile_filter() {
 
     let output = mts
         .command()
-        .args(["status", "--json", "--cluster", "cluster_a"])
+        .args(["fleet", "status", "--json", "--cluster", "cluster_a"])
         .output()
         .expect("failed to execute");
 
@@ -95,14 +95,14 @@ async fn test_status_profile_filter() {
     assert_eq!(clusters[0]["profile"], "cluster_a");
 }
 
-/// Test: status command with the 'st' alias works.
+/// Test: fleet status command with the 'st' alias works.
 #[tokio::test]
-async fn test_status_alias() {
+async fn test_fleet_status_alias() {
     let mts = harness::MultiTestServer::start(&["test_cluster"]).await;
     mts.mount_cluster_fixtures("test_cluster").await;
 
     mts.command()
-        .arg("st")
+        .args(["fleet", "st"])
         .assert()
         .success()
         .stdout(predicate::str::contains("Environment Overview"));
@@ -116,7 +116,7 @@ async fn test_status_detects_cluster_type() {
 
     let output = mts
         .command()
-        .args(["status", "--json"])
+        .args(["fleet", "status", "--json"])
         .output()
         .expect("failed to execute");
 
@@ -130,16 +130,16 @@ async fn test_status_detects_cluster_type() {
     assert_eq!(clusters[0]["cluster_type"], "anq-azure");
 }
 
-/// Test: help text shows the status command.
+/// Test: help text shows the fleet command.
 #[tokio::test]
-async fn test_help_shows_status() {
+async fn test_help_shows_fleet() {
     let mts = harness::MultiTestServer::start(&["test"]).await;
 
     mts.command()
         .arg("--help")
         .assert()
         .success()
-        .stdout(predicate::str::contains("status"));
+        .stdout(predicate::str::contains("fleet"));
 }
 
 // ── Capacity projection tests ─────────────────────────────────────────────────
@@ -162,7 +162,7 @@ async fn test_status_capacity_projection_onprem() {
 
     let output = mts
         .command()
-        .args(["status", "--json"])
+        .args(["fleet", "status", "--json"])
         .output()
         .expect("failed to execute");
 
@@ -196,7 +196,7 @@ async fn test_status_capacity_no_history() {
 
     let output = mts
         .command()
-        .args(["status", "--json"])
+        .args(["fleet", "status", "--json"])
         .output()
         .expect("failed to execute");
 
@@ -229,7 +229,7 @@ async fn test_status_capacity_projection_cloud() {
 
     let output = mts
         .command()
-        .args(["status", "--json"])
+        .args(["fleet", "status", "--json"])
         .output()
         .expect("failed to execute");
 
@@ -267,7 +267,7 @@ async fn test_status_capacity_projection_alert() {
 
     let output = mts
         .command()
-        .args(["status", "--json"])
+        .args(["fleet", "status", "--json"])
         .output()
         .expect("failed to execute");
 
@@ -305,7 +305,7 @@ async fn test_status_healthy_cluster_health_data() {
 
     let output = mts
         .command()
-        .args(["status", "--json"])
+        .args(["fleet", "status", "--json"])
         .output()
         .expect("failed to execute");
 
@@ -367,7 +367,7 @@ async fn test_status_offline_node_alert() {
 
     let output = mts
         .command()
-        .args(["status", "--json", "--no-cache"])
+        .args(["fleet", "status", "--json", "--no-cache"])
         .output()
         .expect("failed to execute");
 
@@ -411,7 +411,7 @@ async fn test_status_unhealthy_disk_alert() {
 
     let output = mts
         .command()
-        .args(["status", "--json", "--no-cache"])
+        .args(["fleet", "status", "--json", "--no-cache"])
         .output()
         .expect("failed to execute");
 
@@ -472,7 +472,7 @@ async fn test_status_degraded_protection_alert() {
 
     let output = mts
         .command()
-        .args(["status", "--json", "--no-cache"])
+        .args(["fleet", "status", "--json", "--no-cache"])
         .output()
         .expect("failed to execute");
 
@@ -526,7 +526,7 @@ async fn test_status_data_at_risk_alert() {
 
     let output = mts
         .command()
-        .args(["status", "--json", "--no-cache"])
+        .args(["fleet", "status", "--json", "--no-cache"])
         .output()
         .expect("failed to execute");
 
@@ -568,7 +568,7 @@ async fn test_status_partial_health_failure() {
 
     let output = mts
         .command()
-        .args(["status", "--json", "--no-cache"])
+        .args(["fleet", "status", "--json", "--no-cache"])
         .output()
         .expect("failed to execute");
 
@@ -617,7 +617,7 @@ async fn test_status_cloud_cluster_empty_psus() {
 
     let output = mts
         .command()
-        .args(["status", "--json", "--no-cache"])
+        .args(["fleet", "status", "--json", "--no-cache"])
         .output()
         .expect("failed to execute");
 
@@ -662,7 +662,7 @@ async fn test_status_gravytrain_fixtures_health() {
 
     let output = mts
         .command()
-        .args(["status", "--json", "--no-cache"])
+        .args(["fleet", "status", "--json", "--no-cache"])
         .output()
         .expect("failed to execute");
 
@@ -714,7 +714,7 @@ async fn test_status_unhealthy_psu_alert() {
 
     let output = mts
         .command()
-        .args(["status", "--json", "--no-cache"])
+        .args(["fleet", "status", "--json", "--no-cache"])
         .output()
         .expect("failed to execute");
 
@@ -743,7 +743,7 @@ async fn test_status_json_includes_node_network_details() {
 
     let output = mts
         .command()
-        .args(["status", "--json"])
+        .args(["fleet", "status", "--json"])
         .output()
         .expect("failed to execute");
 
@@ -789,7 +789,7 @@ async fn test_status_network_connections_403_graceful() {
 
     let output = mts
         .command()
-        .args(["status", "--json"])
+        .args(["fleet", "status", "--json"])
         .output()
         .expect("failed to execute");
 
@@ -820,7 +820,7 @@ async fn test_status_network_status_403_graceful() {
 
     let output = mts
         .command()
-        .args(["status", "--json"])
+        .args(["fleet", "status", "--json"])
         .output()
         .expect("failed to execute");
 
@@ -857,7 +857,7 @@ async fn test_status_onprem_has_link_speed() {
 
     let output = mts
         .command()
-        .args(["status", "--json"])
+        .args(["fleet", "status", "--json"])
         .output()
         .expect("failed to execute");
 
@@ -891,7 +891,7 @@ async fn test_status_file_stats_from_fixtures() {
 
     let output = mts
         .command()
-        .args(["status", "--json", "--no-cache"])
+        .args(["fleet", "status", "--json", "--no-cache"])
         .output()
         .expect("failed to execute");
 
@@ -924,7 +924,7 @@ async fn test_status_idle_cluster_detection() {
 
     let output = mts
         .command()
-        .args(["status", "--json", "--no-cache"])
+        .args(["fleet", "status", "--json", "--no-cache"])
         .output()
         .expect("failed to execute");
 
@@ -958,7 +958,7 @@ async fn test_status_active_cluster_activity() {
 
     let output = mts
         .command()
-        .args(["status", "--json", "--no-cache"])
+        .args(["fleet", "status", "--json", "--no-cache"])
         .output()
         .expect("failed to execute");
 
@@ -983,7 +983,7 @@ async fn test_status_empty_snapshots() {
 
     let output = mts
         .command()
-        .args(["status", "--json", "--no-cache"])
+        .args(["fleet", "status", "--json", "--no-cache"])
         .output()
         .expect("failed to execute");
 
@@ -1059,7 +1059,7 @@ async fn test_status_partial_activity_failure() {
 
     let output = mts
         .command()
-        .args(["status", "--json", "--no-cache"])
+        .args(["fleet", "status", "--json", "--no-cache"])
         .output()
         .expect("failed to execute");
 
@@ -1090,7 +1090,7 @@ async fn test_status_multi_cluster_aggregates() {
 
     let output = mts
         .command()
-        .args(["status", "--json", "--no-cache"])
+        .args(["fleet", "status", "--json", "--no-cache"])
         .output()
         .expect("failed to execute");
 
@@ -1122,7 +1122,7 @@ async fn test_status_json_activity_field_names() {
 
     let output = mts
         .command()
-        .args(["status", "--json", "--no-cache"])
+        .args(["fleet", "status", "--json", "--no-cache"])
         .output()
         .expect("failed to execute");
 
@@ -1151,7 +1151,7 @@ async fn test_status_watch_mode_shows_footer() {
 
     let output = mts
         .command()
-        .args(["status", "--watch", "--interval", "1"])
+        .args(["fleet", "status", "--watch", "--interval", "1"])
         .timeout(std::time::Duration::from_secs(3))
         .output()
         .expect("failed to execute");
@@ -1172,7 +1172,7 @@ async fn test_status_watch_mode_json_multiple_polls() {
 
     let output = mts
         .command()
-        .args(["status", "--watch", "--interval", "1", "--json"])
+        .args(["fleet", "status", "--watch", "--interval", "1", "--json"])
         .timeout(std::time::Duration::from_secs(4))
         .output()
         .expect("failed to execute");
@@ -1276,7 +1276,7 @@ async fn test_status_watch_mode_nic_delta_between_polls() {
 
     let output = mts
         .command()
-        .args(["status", "--watch", "--interval", "1", "--json"])
+        .args(["fleet", "status", "--watch", "--interval", "1", "--json"])
         .timeout(std::time::Duration::from_secs(5))
         .output()
         .expect("failed to execute");
@@ -1432,7 +1432,7 @@ async fn test_e2e_mixed_clusters_terminal_and_json() {
     // ─── Part 1: Terminal output validation ──────────────────────────────────
     let output = mts
         .command()
-        .args(["status", "--no-cache"])
+        .args(["fleet", "status", "--no-cache"])
         .output()
         .expect("failed to execute");
 
@@ -1475,7 +1475,7 @@ async fn test_e2e_mixed_clusters_terminal_and_json() {
     // ─── Part 2: JSON output validation ──────────────────────────────────────
     let json_output = mts
         .command()
-        .args(["status", "--json", "--no-cache"])
+        .args(["fleet", "status", "--json", "--no-cache"])
         .output()
         .expect("failed to execute");
 
@@ -1606,18 +1606,17 @@ async fn test_e2e_mixed_clusters_terminal_and_json() {
     }
 }
 
-/// End-to-end test: `dashboard` alias works with all 3 cluster types.
+/// End-to-end test: `fleet status` with multiple cluster types.
 #[tokio::test]
-async fn test_e2e_dashboard_alias_full_pipeline() {
+async fn test_e2e_fleet_status_full_pipeline() {
     let mts = harness::MultiTestServer::start(&["onprem", "cloud"]).await;
     mts.mount_full_status_fixtures("onprem", "gravytrain").await;
     mts.mount_full_status_fixtures("cloud", "aws-gravytrain")
         .await;
 
-    // Use `dashboard` alias instead of `status`
     let output = mts
         .command()
-        .args(["dashboard", "--json", "--no-cache"])
+        .args(["fleet", "status", "--json", "--no-cache"])
         .output()
         .expect("failed to execute");
 
@@ -1637,7 +1636,7 @@ async fn test_status_timing_flag_produces_stderr_output() {
 
     let output = mts
         .command()
-        .args(["status", "--timing", "--no-cache"])
+        .args(["fleet", "status", "--timing", "--no-cache"])
         .output()
         .expect("failed to execute");
 
@@ -1667,7 +1666,7 @@ async fn test_status_timing_with_json_mode() {
 
     let output = mts
         .command()
-        .args(["status", "--timing", "--json", "--no-cache"])
+        .args(["fleet", "status", "--timing", "--json", "--no-cache"])
         .output()
         .expect("failed to execute");
 
@@ -1694,7 +1693,7 @@ async fn test_status_no_timing_without_flag() {
 
     let output = mts
         .command()
-        .args(["status", "--json", "--no-cache"])
+        .args(["fleet", "status", "--json", "--no-cache"])
         .output()
         .expect("failed to execute");
 
@@ -1715,7 +1714,7 @@ async fn test_status_timing_multi_cluster() {
 
     let output = mts
         .command()
-        .args(["status", "--timing", "--no-cache"])
+        .args(["fleet", "status", "--timing", "--no-cache"])
         .output()
         .expect("failed to execute");
 
@@ -1752,7 +1751,7 @@ async fn test_status_timing_unreachable_cluster() {
 
     let output = mts
         .command()
-        .args(["status", "--timing", "--no-cache"])
+        .args(["fleet", "status", "--timing", "--no-cache"])
         .output()
         .expect("failed to execute");
 
