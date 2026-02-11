@@ -1,6 +1,8 @@
+use std::io::IsTerminal;
 use std::time::Instant;
 
 use anyhow::Result;
+use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use serde_json::Value;
 
 use crate::client::QumuloClient;
@@ -16,15 +18,46 @@ use super::types::*;
 type NicStatsMap =
     std::collections::HashMap<u64, (Option<u64>, Option<u64>, Option<f64>, Option<u64>)>;
 
+/// Create a MultiProgress with one spinner per cluster for progress display.
+/// Returns None if progress display should be skipped (non-TTY, json mode).
+fn create_progress_spinners(
+    profile_names: &[(String, ProfileEntry)],
+    json_mode: bool,
+) -> Option<(MultiProgress, Vec<ProgressBar>)> {
+    if json_mode || !std::io::stderr().is_terminal() {
+        return None;
+    }
+
+    let mp = MultiProgress::new();
+    let style = ProgressStyle::with_template("{spinner:.cyan} {wide_msg}")
+        .unwrap()
+        .tick_chars("⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏");
+
+    let spinners: Vec<ProgressBar> = profile_names
+        .iter()
+        .map(|(name, _)| {
+            let pb = mp.add(ProgressBar::new_spinner());
+            pb.set_style(style.clone());
+            pb.set_message(format!("{}  connecting...", name));
+            pb.enable_steady_tick(std::time::Duration::from_millis(80));
+            pb
+        })
+        .collect();
+
+    Some((mp, spinners))
+}
+
 /// Collect status from all configured clusters (or a filtered subset) in parallel.
 /// When `watch_mode` is true, NIC stats use a single call (no 1-second sleep)
 /// and return raw byte counters for inter-poll delta computation.
+/// When `json_mode` is true (or stdout is not a TTY), progress spinners are suppressed.
 pub fn collect_all(
     config: &Config,
     profile_filters: &[String],
     timeout_secs: u64,
     no_cache: bool,
     watch_mode: bool,
+    json_mode: bool,
 ) -> Result<EnvironmentStatus> {
     // Determine which profiles to query
     let profiles: Vec<(String, ProfileEntry)> = if profile_filters.is_empty() {
@@ -49,14 +82,50 @@ pub fn collect_all(
         anyhow::bail!("no matching profiles found — add profiles with `qontrol profile add`");
     }
 
+    // Set up progress spinners (skipped for non-TTY / json mode)
+    let progress = create_progress_spinners(&profiles, json_mode);
+
     // Spawn one thread per cluster for parallel collection
     let results: Vec<ClusterResult> = std::thread::scope(|s| {
         let handles: Vec<_> = profiles
             .iter()
-            .map(|(name, entry)| {
+            .enumerate()
+            .map(|(idx, (name, entry))| {
                 let name = name.clone();
                 let entry = entry.clone();
-                s.spawn(move || collect_cluster(&name, &entry, timeout_secs, watch_mode))
+                let spinner = progress.as_ref().map(|(_, spinners)| spinners[idx].clone());
+                s.spawn(move || {
+                    let on_progress = |msg: &str| {
+                        if let Some(ref pb) = spinner {
+                            pb.set_message(format!("{}  {}", name, msg));
+                        }
+                    };
+                    let result = collect_cluster(&name, &entry, timeout_secs, watch_mode, &on_progress);
+                    // Finish spinner based on result
+                    if let Some(ref pb) = spinner {
+                        match &result {
+                            ClusterResult::Success { latency_ms, .. } => {
+                                pb.set_style(
+                                    ProgressStyle::with_template("{msg}").unwrap(),
+                                );
+                                pb.finish_with_message(format!(
+                                    "\x1b[32m✓\x1b[0m {}  done ({}ms)",
+                                    name, latency_ms
+                                ));
+                            }
+                            ClusterResult::Unreachable { .. } => {
+                                pb.set_style(
+                                    ProgressStyle::with_template("{msg}").unwrap(),
+                                );
+                                pb.finish_with_message(format!(
+                                    "\x1b[33m⚠\x1b[0m {}  unreachable",
+                                    name
+                                ));
+                            }
+                        }
+                    }
+                    result
+                })
             })
             .collect();
 
@@ -70,6 +139,11 @@ pub fn collect_all(
             })
             .collect()
     });
+
+    // Clear progress lines before rendering final output
+    if let Some((mp, _)) = progress {
+        mp.clear().ok();
+    }
 
     // Process results: successes go into clusters, failures try cache fallback
     let mut clusters = Vec::new();
@@ -141,12 +215,15 @@ pub fn collect_all(
 }
 
 /// Collect status from a single cluster. Returns a ClusterResult.
+/// The `on_progress` callback is invoked with a message describing the current API call.
 fn collect_cluster(
     profile: &str,
     entry: &ProfileEntry,
     timeout_secs: u64,
     watch_mode: bool,
+    on_progress: &dyn Fn(&str),
 ) -> ClusterResult {
+    on_progress("connecting...");
     let client = match QumuloClient::new(entry, timeout_secs) {
         Ok(c) => c,
         Err(e) => {
@@ -158,6 +235,7 @@ fn collect_cluster(
     };
 
     // Fetch basic cluster data
+    on_progress("fetching cluster settings...");
     let settings = match client.get_cluster_settings() {
         Ok(v) => v,
         Err(e) => {
@@ -169,6 +247,7 @@ fn collect_cluster(
     };
 
     // Measure latency from just the /v1/version call (lightweight, near-zero server work)
+    on_progress("fetching version...");
     let start = Instant::now();
     let version = match client.get_version() {
         Ok(v) => v,
@@ -181,6 +260,7 @@ fn collect_cluster(
     };
     let latency_ms = start.elapsed().as_millis() as u64;
 
+    on_progress("fetching nodes...");
     let nodes_data = match client.get_cluster_nodes() {
         Ok(v) => v,
         Err(e) => {
@@ -229,12 +309,17 @@ fn collect_cluster(
         .to_string();
 
     // Fetch optional data — don't fail if these are unavailable
+    on_progress("fetching capacity...");
     let mut capacity = fetch_capacity(&client);
+    on_progress("fetching activity...");
     let activity = fetch_activity(&client);
+    on_progress("fetching file stats...");
     let files = fetch_file_stats(&client);
+    on_progress("fetching network stats...");
     let node_details = fetch_node_network_details(&client, &cluster_type, watch_mode);
 
     // Fetch capacity history and compute projection
+    on_progress("fetching capacity history...");
     capacity.projection = fetch_capacity_projection(
         &client,
         capacity.used_bytes,
@@ -243,6 +328,7 @@ fn collect_cluster(
     );
 
     // Fetch health data — each individually wrapped for error isolation
+    on_progress("fetching health data...");
     let (unhealthy_disks, disk_details) = fetch_disk_health(&client);
     let (unhealthy_psus, psu_details) = fetch_psu_health(&client);
     let (remaining_node_failures, remaining_drive_failures, protection_type) =

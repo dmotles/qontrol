@@ -103,7 +103,9 @@ pub fn run(
     let mut watch_state: Option<WatchState> = None;
 
     loop {
-        let mut status = collector::collect_all(config, profiles, timeout_secs, no_cache, watch)?;
+        let mut status = collector::collect_all(
+            config, profiles, timeout_secs, no_cache, watch, json_mode,
+        )?;
 
         // In watch mode, compute NIC throughput from deltas between polls
         if watch {
