@@ -162,8 +162,15 @@ fn render_cluster_header(out: &mut String, cluster: &ClusterStatus) {
         format!("{} · {}", type_info, cluster.version)
     };
 
-    // Left-align name, right-align metadata with padding
-    let name_str = format!("  {}", cluster.name);
+    // Show profile as primary label; append cluster name if different
+    let label = if cluster.profile != cluster.name {
+        format!("{} ({})", cluster.profile, cluster.name)
+    } else {
+        cluster.name.clone()
+    };
+
+    // Left-align label, right-align metadata with padding
+    let name_str = format!("  {}", label);
     let gap = HEADER_WIDTH.saturating_sub(name_str.len() + right_side.len());
     out.push_str(&format!(
         "{}{}{}\n",
@@ -692,7 +699,7 @@ mod tests {
         assert!(plain.contains("Environment Overview"));
         assert!(plain.contains("Clusters: 1 (all healthy)"));
         assert!(plain.contains("Nodes:    5 total (5 online)"));
-        assert!(plain.contains("gravytrain-sg"));
+        assert!(plain.contains("gravytrain (gravytrain-sg)"));
         assert!(plain.contains("on-prem · C192T, QCT_D52T"));
         assert!(plain.contains("5/5 online"));
         assert!(plain.contains("Activity: R: 140 IOPS"));
@@ -707,6 +714,7 @@ mod tests {
         let output = render(&status);
         let plain = strip_ansi(&output);
 
+        // profile == name, so only shown once
         assert!(plain.contains("aws-gravytrain"));
         assert!(plain.contains("CNQ · AWS"));
         assert!(plain.contains("3/3 online"));
@@ -725,8 +733,8 @@ mod tests {
         assert!(plain.contains("5/6 online"));
         assert!(plain.contains("node 4: OFFLINE"));
         assert!(plain.contains("OFFLINE"));
-        // Alerts section should have the node offline alert
-        assert!(plain.contains("iss-sg"));
+        // Cluster header shows profile (name) since they differ
+        assert!(plain.contains("iss (iss-sg)"));
     }
 
     #[test]
@@ -1427,8 +1435,9 @@ mod tests {
         assert!(plain.contains("Latency: 42-142ms"));
         assert!(plain.contains("8 total (8 online)"));
 
-        // Both cluster sections present
-        assert!(plain.contains("gravytrain-sg"));
+        // Both cluster sections present — gravytrain has different profile/name
+        assert!(plain.contains("gravytrain (gravytrain-sg)"));
+        // aws-gravytrain has same profile/name, shown once
         assert!(plain.contains("aws-gravytrain"));
         assert!(plain.contains("on-prem · C192T, QCT_D52T"));
         assert!(plain.contains("CNQ · AWS"));
