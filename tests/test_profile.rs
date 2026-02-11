@@ -34,6 +34,7 @@ fn test_profile_add_token_requires_host() {
 #[tokio::test]
 async fn test_profile_add_with_token() {
     let ts = TestServer::start().await;
+    ts.mount_fixture("node_state").await;
 
     // Add a new profile using manual --token flow
     ts.command()
@@ -56,6 +57,15 @@ async fn test_profile_add_with_token() {
         .assert()
         .success()
         .stdout(predicate::str::contains("manual"));
+
+    // Verify the cluster UUID was stored
+    ts.command()
+        .args(["profile", "show", "manual", "--json"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+        ));
 }
 
 #[tokio::test]
@@ -115,8 +125,13 @@ async fn test_profile_add_with_token_and_options() {
 #[tokio::test]
 async fn test_profile_add_interactive_login() {
     let ts = TestServer::start().await;
-    ts.mount_fixtures(&["session_login", "session_who_am_i", "access_token_create"])
-        .await;
+    ts.mount_fixtures(&[
+        "session_login",
+        "session_who_am_i",
+        "access_token_create",
+        "node_state",
+    ])
+    .await;
 
     let port = ts.mock_server.address().port().to_string();
     ts.command()
@@ -145,7 +160,10 @@ async fn test_profile_add_interactive_login() {
         .args(["profile", "show", "testcluster", "--json"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("ed-token"));
+        .stdout(predicate::str::contains("ed-token"))
+        .stdout(predicate::str::contains(
+            "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+        ));
 }
 
 #[tokio::test]

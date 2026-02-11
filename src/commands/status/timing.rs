@@ -181,10 +181,7 @@ mod tests {
                     duration_ms: 50,
                 },
             ],
-            cluster_wall_clock: vec![
-                ("az-gravytrain".into(), 25102),
-                ("iss".into(), 8230),
-            ],
+            cluster_wall_clock: vec![("az-gravytrain".into(), 25102), ("iss".into(), 8230)],
         };
         // Should not panic
         render_timing_report(&report);
@@ -244,10 +241,7 @@ mod tests {
                     duration_ms: 30,
                 },
             ],
-            cluster_wall_clock: vec![
-                ("failing".into(), 150),
-                ("healthy".into(), 80),
-            ],
+            cluster_wall_clock: vec![("failing".into(), 150), ("healthy".into(), 80)],
         };
 
         // Failing cluster should show partial timing up to failure point

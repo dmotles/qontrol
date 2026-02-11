@@ -194,6 +194,10 @@ impl QumuloClient {
         self.request("GET", "/v1/version", None)
     }
 
+    pub fn get_node_state(&self) -> Result<Value> {
+        self.request("GET", "/v1/node/state", None)
+    }
+
     pub fn get_cluster_nodes(&self) -> Result<Value> {
         self.request("GET", "/v1/cluster/nodes/", None)
     }
@@ -416,10 +420,7 @@ mod tests {
         let value = json!({"cluster_name": "test"});
         // Insert with a timestamp far in the past
         let old_time = Instant::now() - Duration::from_secs(600);
-        cache
-            .lock()
-            .unwrap()
-            .insert(key.clone(), (old_time, value));
+        cache.lock().unwrap().insert(key.clone(), (old_time, value));
 
         // Should be expired for TTL_SLOW (300s)
         let guard = cache.lock().unwrap();
@@ -444,7 +445,9 @@ mod tests {
                 std::thread::spawn(move || {
                     let key = format!("https://host:8000/v1/endpoint/{}", i);
                     let value = json!({"id": i});
-                    c.lock().unwrap().insert(key.clone(), (Instant::now(), value.clone()));
+                    c.lock()
+                        .unwrap()
+                        .insert(key.clone(), (Instant::now(), value.clone()));
                     let guard = c.lock().unwrap();
                     let (_, v) = guard.get(&key).unwrap();
                     assert_eq!(*v, value);

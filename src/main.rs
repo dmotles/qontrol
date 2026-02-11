@@ -14,7 +14,7 @@ use cli::{
     SnapshotCommands,
 };
 use client::QumuloClient;
-use config::{load_config, resolve_profile};
+use config::{ensure_cluster_uuids, load_config, resolve_profile};
 
 fn main() {
     let cli = Cli::parse();
@@ -137,7 +137,8 @@ fn run(cli: Cli) -> Result<()> {
                 no_cache,
                 timing,
             } => {
-                let config = load_config()?;
+                let mut config = load_config()?;
+                ensure_cluster_uuids(&mut config, cli.global_opts.timeout);
                 commands::status::run(
                     &config,
                     &profiles,

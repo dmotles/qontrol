@@ -1338,8 +1338,14 @@ async fn test_e2e_mixed_clusters_terminal_and_json() {
     // Mount full fixtures for on-prem (gravytrain)
     mts.mount_full_status_fixtures("onprem", "gravytrain").await;
     // Also need health + network for on-prem
-    mts.mount_status_fixture("onprem", "gravytrain", "cluster_slots", "GET", "/v1/cluster/slots/")
-        .await;
+    mts.mount_status_fixture(
+        "onprem",
+        "gravytrain",
+        "cluster_slots",
+        "GET",
+        "/v1/cluster/slots/",
+    )
+    .await;
     mts.mount_status_fixture(
         "onprem",
         "gravytrain",
@@ -1384,8 +1390,14 @@ async fn test_e2e_mixed_clusters_terminal_and_json() {
     // Mount full fixtures for cloud (aws-gravytrain)
     mts.mount_full_status_fixtures("cloud", "aws-gravytrain")
         .await;
-    mts.mount_status_fixture("cloud", "aws-gravytrain", "cluster_slots", "GET", "/v1/cluster/slots/")
-        .await;
+    mts.mount_status_fixture(
+        "cloud",
+        "aws-gravytrain",
+        "cluster_slots",
+        "GET",
+        "/v1/cluster/slots/",
+    )
+    .await;
     mts.mount_status_fixture(
         "cloud",
         "aws-gravytrain",
@@ -1452,10 +1464,7 @@ async fn test_e2e_mixed_clusters_terminal_and_json() {
     );
 
     // Alerts section
-    assert!(
-        stdout.contains("Alerts"),
-        "should have alerts section"
-    );
+    assert!(stdout.contains("Alerts"), "should have alerts section");
     // Broken cluster should produce an alert
     assert!(
         stdout.contains("broken"),
@@ -1547,7 +1556,9 @@ async fn test_e2e_mixed_clusters_terminal_and_json() {
     );
 
     // Clusters validation
-    let clusters = json["clusters"].as_array().expect("clusters should be array");
+    let clusters = json["clusters"]
+        .as_array()
+        .expect("clusters should be array");
     assert!(
         clusters.len() >= 2,
         "should have at least 2 clusters (reachable ones)"
@@ -1560,7 +1571,10 @@ async fn test_e2e_mixed_clusters_terminal_and_json() {
         .expect("should have onprem cluster");
     assert_eq!(onprem["reachable"], true);
     assert_eq!(onprem["stale"], false);
-    assert!(onprem["latency_ms"].as_u64().is_some(), "should have latency_ms");
+    assert!(
+        onprem["latency_ms"].as_u64().is_some(),
+        "should have latency_ms"
+    );
     assert_eq!(onprem["cluster_type"], "on-prem");
     assert!(onprem["nodes"]["total"].as_u64().unwrap() > 0);
     assert!(onprem["capacity"]["total_bytes"].as_u64().unwrap() > 0);
@@ -1674,7 +1688,8 @@ async fn test_status_timing_with_json_mode() {
 
     // stdout should be valid JSON (timing doesn't pollute it)
     let stdout = String::from_utf8_lossy(&output.stdout);
-    let json: serde_json::Value = serde_json::from_str(&stdout).expect("--timing should not break JSON stdout");
+    let json: serde_json::Value =
+        serde_json::from_str(&stdout).expect("--timing should not break JSON stdout");
     assert!(json.get("clusters").is_some());
 
     // stderr should have timing data

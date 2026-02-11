@@ -54,6 +54,7 @@ fn create_progress_spinners(
 /// and return raw byte counters for inter-poll delta computation.
 /// When `json_mode` is true (or stdout is not a TTY), progress spinners are suppressed.
 /// When `record_timing` is true, returns a TimingReport with per-API-call durations.
+#[allow(clippy::too_many_arguments)]
 pub fn collect_all(
     config: &Config,
     profile_filters: &[String],
@@ -109,7 +110,12 @@ pub fn collect_all(
                     };
                     let wall_start = Instant::now();
                     let (result, call_timings) = collect_cluster(
-                        &name, &entry, timeout_secs, watch_mode, &on_progress, record_timing,
+                        &name,
+                        &entry,
+                        timeout_secs,
+                        watch_mode,
+                        &on_progress,
+                        record_timing,
                         thread_cache,
                     );
                     let wall_ms = wall_start.elapsed().as_millis() as u64;
@@ -117,18 +123,14 @@ pub fn collect_all(
                     if let Some(ref pb) = spinner {
                         match &result {
                             ClusterResult::Success { latency_ms, .. } => {
-                                pb.set_style(
-                                    ProgressStyle::with_template("{msg}").unwrap(),
-                                );
+                                pb.set_style(ProgressStyle::with_template("{msg}").unwrap());
                                 pb.finish_with_message(format!(
                                     "\x1b[32m✓\x1b[0m {}  done ({}ms)",
                                     name, latency_ms
                                 ));
                             }
                             ClusterResult::Unreachable { .. } => {
-                                pb.set_style(
-                                    ProgressStyle::with_template("{msg}").unwrap(),
-                                );
+                                pb.set_style(ProgressStyle::with_template("{msg}").unwrap());
                                 pb.finish_with_message(format!(
                                     "\x1b[33m⚠\x1b[0m {}  unreachable",
                                     name
@@ -144,14 +146,16 @@ pub fn collect_all(
         handles
             .into_iter()
             .map(|h| {
-                h.join().unwrap_or_else(|_| (
-                    ClusterResult::Unreachable {
-                        profile: "unknown".to_string(),
-                        error: "thread panicked".to_string(),
-                    },
-                    Vec::new(),
-                    0,
-                ))
+                h.join().unwrap_or_else(|_| {
+                    (
+                        ClusterResult::Unreachable {
+                            profile: "unknown".to_string(),
+                            error: "thread panicked".to_string(),
+                        },
+                        Vec::new(),
+                        0,
+                    )
+                })
             })
             .collect()
     });
@@ -381,7 +385,15 @@ fn collect_cluster(
         .as_str()
         .unwrap_or("unknown")
         .to_string();
-    let cluster_uuid = settings["cluster_uuid"].as_str().unwrap_or("").to_string();
+    // Prefer UUID from saved profile config; fall back to fetching from /v1/node/state
+    let cluster_uuid =
+        entry
+            .cluster_uuid
+            .clone()
+            .unwrap_or_else(|| match client.get_node_state() {
+                Ok(state) => state["cluster_id"].as_str().unwrap_or("").to_string(),
+                Err(_) => String::new(),
+            });
     let version_str = version["revision_id"]
         .as_str()
         .unwrap_or("unknown")
@@ -404,7 +416,12 @@ fn collect_cluster(
     on_progress("fetching capacity history...");
     capacity.projection = timed!(
         "get_capacity_history",
-        fetch_capacity_projection(&client, capacity.used_bytes, capacity.total_bytes, &cluster_type)
+        fetch_capacity_projection(
+            &client,
+            capacity.used_bytes,
+            capacity.total_bytes,
+            &cluster_type
+        )
     );
 
     // Fetch health data — each individually wrapped for error isolation

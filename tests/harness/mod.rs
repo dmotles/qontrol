@@ -76,6 +76,7 @@ const FIXTURE_ROUTES: &[(&str, &str, &str)] = &[
         "GET",
         "/v1/cluster/restriper/status",
     ),
+    ("node_state", "GET", "/v1/node/state"),
     ("session_login", "POST", "/v1/session/login"),
     ("session_who_am_i", "GET", "/v1/session/who-am-i"),
     ("access_token_create", "POST", "/v1/auth/access-tokens/"),

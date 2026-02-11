@@ -20,6 +20,9 @@ pub struct ProfileEntry {
     pub token: String,
     #[serde(default)]
     pub insecure: bool,
+    /// Cluster UUID fetched from GET /v1/node/state → cluster_id. Persisted for cache keying.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cluster_uuid: Option<String>,
     /// Override the base URL for this profile (e.g. "http://proxy:8080"). Used by test harness.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub base_url: Option<String>,
@@ -67,6 +70,42 @@ pub fn save_config(config: &Config) -> Result<()> {
     Ok(())
 }
 
+/// Backfill missing cluster UUIDs for all profiles.
+/// Connects to each cluster that lacks a UUID, fetches it from /v1/node/state, and saves.
+/// Failures are logged and skipped — this never blocks normal operation.
+pub fn ensure_cluster_uuids(config: &mut Config, timeout_secs: u64) {
+    let mut updated = false;
+    for (name, entry) in config.profiles.iter_mut() {
+        if entry.cluster_uuid.is_some() {
+            continue;
+        }
+        let client = match crate::client::QumuloClient::new(entry, timeout_secs, None) {
+            Ok(c) => c,
+            Err(e) => {
+                tracing::debug!(profile = %name, error = %e, "skipping UUID backfill: cannot connect");
+                continue;
+            }
+        };
+        match client.get_node_state() {
+            Ok(state) => {
+                if let Some(uuid) = state["cluster_id"].as_str() {
+                    tracing::info!(profile = %name, uuid = %uuid, "backfilled cluster UUID");
+                    entry.cluster_uuid = Some(uuid.to_string());
+                    updated = true;
+                }
+            }
+            Err(e) => {
+                tracing::debug!(profile = %name, error = %e, "skipping UUID backfill: API call failed");
+            }
+        }
+    }
+    if updated {
+        if let Err(e) = save_config(config) {
+            tracing::warn!(error = %e, "failed to save config after UUID backfill");
+        }
+    }
+}
+
 /// Resolve which profile to use: --profile flag > QONTROL_PROFILE env (via clap) > default_profile > error
 pub fn resolve_profile(
     config: &Config,
@@ -102,6 +141,7 @@ mod tests {
                 port: 8000,
                 token: "access-v1:abc123".to_string(),
                 insecure: true,
+                cluster_uuid: None,
                 base_url: None,
             },
         );
@@ -128,6 +168,7 @@ mod tests {
                 port: 8000,
                 token: "tok".to_string(),
                 insecure: false,
+                cluster_uuid: None,
                 base_url: None,
             },
         );
@@ -149,6 +190,7 @@ mod tests {
                 port: 8000,
                 token: "tok".to_string(),
                 insecure: false,
+                cluster_uuid: None,
                 base_url: None,
             },
         );
@@ -172,5 +214,64 @@ mod tests {
         let flag = Some("nonexistent".to_string());
         let result = resolve_profile(&config, &flag);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_toml_roundtrip_with_cluster_uuid() {
+        let mut config = Config::default();
+        config.profiles.insert(
+            "test".to_string(),
+            ProfileEntry {
+                host: "10.0.0.1".to_string(),
+                port: 8000,
+                token: "tok".to_string(),
+                insecure: false,
+                cluster_uuid: Some("a1b2c3d4-e5f6-7890-abcd-ef1234567890".to_string()),
+                base_url: None,
+            },
+        );
+
+        let serialized = toml::to_string_pretty(&config).unwrap();
+        assert!(serialized.contains("cluster_uuid"));
+        let deserialized: Config = toml::from_str(&serialized).unwrap();
+        let entry = &deserialized.profiles["test"];
+        assert_eq!(
+            entry.cluster_uuid.as_deref(),
+            Some("a1b2c3d4-e5f6-7890-abcd-ef1234567890")
+        );
+    }
+
+    #[test]
+    fn test_toml_roundtrip_without_cluster_uuid() {
+        // Old config files without cluster_uuid should deserialize with None
+        let toml_str = r#"
+[profiles.old]
+host = "10.0.0.1"
+port = 8000
+token = "tok"
+insecure = false
+"#;
+        let config: Config = toml::from_str(toml_str).unwrap();
+        let entry = &config.profiles["old"];
+        assert_eq!(entry.cluster_uuid, None);
+    }
+
+    #[test]
+    fn test_cluster_uuid_none_not_serialized() {
+        let mut config = Config::default();
+        config.profiles.insert(
+            "test".to_string(),
+            ProfileEntry {
+                host: "10.0.0.1".to_string(),
+                port: 8000,
+                token: "tok".to_string(),
+                insecure: false,
+                cluster_uuid: None,
+                base_url: None,
+            },
+        );
+
+        let serialized = toml::to_string_pretty(&config).unwrap();
+        assert!(!serialized.contains("cluster_uuid"));
     }
 }

@@ -83,6 +83,7 @@ fn extract_nic_counters(status: &EnvironmentStatus) -> HashMap<(String, u64), u6
 }
 
 /// Entry point for the `status` command.
+#[allow(clippy::too_many_arguments)]
 pub fn run(
     config: &Config,
     profiles: &[String],
@@ -116,7 +117,13 @@ pub fn run(
 
     loop {
         let (mut status, timing_report) = collector::collect_all(
-            config, profiles, timeout_secs, no_cache, watch, json_mode, show_timing,
+            config,
+            profiles,
+            timeout_secs,
+            no_cache,
+            watch,
+            json_mode,
+            show_timing,
             api_cache.clone(),
             // Suppress progress spinners on subsequent watch polls so the last
             // render stays visible during data collection.

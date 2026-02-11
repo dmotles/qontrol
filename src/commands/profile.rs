@@ -15,6 +15,18 @@ pub fn add(
 ) -> Result<()> {
     let mut config = load_config()?;
 
+    // Attempt to fetch cluster UUID from the node state endpoint
+    let cluster_uuid = match QumuloClient::from_host(&host, port, insecure, 10, &token) {
+        Ok(client) => match client.get_node_state() {
+            Ok(state) => state["cluster_id"].as_str().map(|s| s.to_string()),
+            Err(e) => {
+                tracing::warn!(error = %e, "could not fetch cluster UUID");
+                None
+            }
+        },
+        Err(_) => None,
+    };
+
     config.profiles.insert(
         name.clone(),
         ProfileEntry {
@@ -22,6 +34,7 @@ pub fn add(
             port,
             token,
             insecure,
+            cluster_uuid,
             base_url: None,
         },
     );
@@ -131,6 +144,19 @@ pub fn add_interactive(
         expiration_str.as_deref(),
     )?;
 
+    // Fetch cluster UUID using the new access token
+    let cluster_uuid = match QumuloClient::from_host(&host, port, insecure, timeout, &access_token)
+    {
+        Ok(client) => match client.get_node_state() {
+            Ok(state) => state["cluster_id"].as_str().map(|s| s.to_string()),
+            Err(e) => {
+                tracing::warn!(error = %e, "could not fetch cluster UUID");
+                None
+            }
+        },
+        Err(_) => None,
+    };
+
     // Save profile
     let mut config = load_config()?;
 
@@ -141,6 +167,7 @@ pub fn add_interactive(
             port,
             token: access_token,
             insecure,
+            cluster_uuid,
             base_url: None,
         },
     );
@@ -323,6 +350,9 @@ pub fn show(name: Option<String>, config: &Config, json_mode: bool) -> Result<()
         println!("  Host:     {}:{}", entry.host, entry.port);
         println!("  Token:    {}", redact_token(&entry.token));
         println!("  Insecure: {}", entry.insecure);
+        if let Some(ref uuid) = entry.cluster_uuid {
+            println!("  UUID:     {}", uuid);
+        }
     }
 
     Ok(())
