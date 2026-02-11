@@ -10,12 +10,13 @@ pub mod types;
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 
 use anyhow::Result;
 
+use crate::client::ApiCache;
 use crate::config::Config;
 
 use self::types::EnvironmentStatus;
@@ -102,11 +103,20 @@ pub fn run(
         .ok(); // Ignore if handler can't be set (e.g., already set)
     }
 
+    // Create a shared API response cache for watch mode. In non-watch mode the cache
+    // is still passed but has no effect (single poll, nothing to reuse).
+    let api_cache: Option<ApiCache> = if watch {
+        Some(Arc::new(Mutex::new(HashMap::new())))
+    } else {
+        None
+    };
+
     let mut watch_state: Option<WatchState> = None;
 
     loop {
         let (mut status, timing_report) = collector::collect_all(
             config, profiles, timeout_secs, no_cache, watch, json_mode, show_timing,
+            api_cache.clone(),
         )?;
 
         // In watch mode, compute NIC throughput from deltas between polls

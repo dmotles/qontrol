@@ -85,7 +85,7 @@ fn run(cli: Cli) -> Result<()> {
         Commands::Api { command } => {
             let config = load_config()?;
             let (_, profile) = resolve_profile(&config, &cli.profile)?;
-            let client = QumuloClient::new(&profile, cli.global_opts.timeout)?;
+            let client = QumuloClient::new(&profile, cli.global_opts.timeout, None)?;
             match command {
                 ApiCommands::Raw { method, path, body } => {
                     commands::api::raw(&client, &method, &path, body.as_deref())
@@ -95,7 +95,7 @@ fn run(cli: Cli) -> Result<()> {
         Commands::Cluster { command } => {
             let config = load_config()?;
             let (_, profile) = resolve_profile(&config, &cli.profile)?;
-            let client = QumuloClient::new(&profile, cli.global_opts.timeout)?;
+            let client = QumuloClient::new(&profile, cli.global_opts.timeout, None)?;
             match command {
                 ClusterCommands::Info => commands::cluster::info(&client, cli.global_opts.json),
             }
@@ -103,7 +103,7 @@ fn run(cli: Cli) -> Result<()> {
         Commands::Snapshot { command } => {
             let config = load_config()?;
             let (_, profile) = resolve_profile(&config, &cli.profile)?;
-            let client = QumuloClient::new(&profile, cli.global_opts.timeout)?;
+            let client = QumuloClient::new(&profile, cli.global_opts.timeout, None)?;
             match command {
                 SnapshotCommands::List => commands::snapshot::list(&client, cli.global_opts.json),
                 SnapshotCommands::Show { id } => {
@@ -150,7 +150,7 @@ fn run(cli: Cli) -> Result<()> {
         Commands::Fs { command } => {
             let config = load_config()?;
             let (_, profile) = resolve_profile(&config, &cli.profile)?;
-            let client = QumuloClient::new(&profile, cli.global_opts.timeout)?;
+            let client = QumuloClient::new(&profile, cli.global_opts.timeout, None)?;
             match command {
                 FsCommands::Ls {
                     path,

@@ -1,4 +1,6 @@
-use std::time::Duration;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 
 use anyhow::{Context, Result};
 use reqwest::blocking::Client;
@@ -7,10 +9,20 @@ use serde_json::Value;
 use crate::config::ProfileEntry;
 use crate::error::QontrolError;
 
+/// Thread-safe in-memory API response cache: cache_key → (inserted_at, response).
+pub type ApiCache = Arc<Mutex<HashMap<String, (Instant, Value)>>>;
+
+/// TTL for slow, rarely-changing endpoints (chassis PSU, cluster settings, disk slots).
+const TTL_SLOW: Duration = Duration::from_secs(300); // 5 minutes
+
+/// TTL for moderate endpoints (file aggregates, snapshots, capacity history).
+const TTL_MODERATE: Duration = Duration::from_secs(30);
+
 pub struct QumuloClient {
     client: Client,
     base_url: String,
     token: String,
+    cache: Option<ApiCache>,
 }
 
 impl QumuloClient {
@@ -35,10 +47,11 @@ impl QumuloClient {
             client,
             base_url,
             token: token.to_string(),
+            cache: None,
         })
     }
 
-    pub fn new(profile: &ProfileEntry, timeout_secs: u64) -> Result<Self> {
+    pub fn new(profile: &ProfileEntry, timeout_secs: u64, cache: Option<ApiCache>) -> Result<Self> {
         let client = Client::builder()
             .danger_accept_invalid_certs(profile.insecure)
             .timeout(Duration::from_secs(timeout_secs))
@@ -55,6 +68,7 @@ impl QumuloClient {
             client,
             base_url,
             token: profile.token.clone(),
+            cache,
         })
     }
 
@@ -146,10 +160,34 @@ impl QumuloClient {
         serde_json::from_str(&response_body).with_context(|| "failed to parse response as JSON")
     }
 
+    /// Check cache for a GET response; if missing or expired, fetch from API and cache it.
+    /// When no cache is configured, this is equivalent to a plain GET request.
+    fn cached_get(&self, path: &str, ttl: Duration) -> Result<Value> {
+        let cache_key = format!("{}{}", self.base_url, path);
+
+        if let Some(ref cache) = self.cache {
+            let guard = cache.lock().unwrap();
+            if let Some((inserted_at, value)) = guard.get(&cache_key) {
+                if inserted_at.elapsed() < ttl {
+                    return Ok(value.clone());
+                }
+            }
+        }
+
+        let result = self.request("GET", path, None)?;
+
+        if let Some(ref cache) = self.cache {
+            let mut guard = cache.lock().unwrap();
+            guard.insert(cache_key, (Instant::now(), result.clone()));
+        }
+
+        Ok(result)
+    }
+
     // Convenience methods for cluster commands
 
     pub fn get_cluster_settings(&self) -> Result<Value> {
-        self.request("GET", "/v1/cluster/settings", None)
+        self.cached_get("/v1/cluster/settings", TTL_SLOW)
     }
 
     pub fn get_version(&self) -> Result<Value> {
@@ -166,14 +204,11 @@ impl QumuloClient {
 
     /// Fetch capacity history for the last N days.
     pub fn get_capacity_history(&self, begin_time_epoch: i64) -> Result<Value> {
-        self.request(
-            "GET",
-            &format!(
-                "/v1/analytics/capacity-history/?begin-time={}&interval=DAILY",
-                begin_time_epoch
-            ),
-            None,
-        )
+        let path = format!(
+            "/v1/analytics/capacity-history/?begin-time={}&interval=DAILY",
+            begin_time_epoch
+        );
+        self.cached_get(&path, TTL_MODERATE)
     }
 
     pub fn get_activity_by_type(&self, activity_type: &str) -> Result<Value> {
@@ -187,11 +222,11 @@ impl QumuloClient {
     // Health endpoints
 
     pub fn get_cluster_slots(&self) -> Result<Value> {
-        self.request("GET", "/v1/cluster/slots/", None)
+        self.cached_get("/v1/cluster/slots/", TTL_SLOW)
     }
 
     pub fn get_cluster_chassis(&self) -> Result<Value> {
-        self.request("GET", "/v1/cluster/nodes/chassis/", None)
+        self.cached_get("/v1/cluster/nodes/chassis/", TTL_SLOW)
     }
 
     pub fn get_cluster_protection_status(&self) -> Result<Value> {
@@ -215,11 +250,11 @@ impl QumuloClient {
     // Snapshot methods
 
     pub fn get_snapshots(&self) -> Result<Value> {
-        self.request("GET", "/v2/snapshots/", None)
+        self.cached_get("/v2/snapshots/", TTL_MODERATE)
     }
 
     pub fn get_snapshots_total_capacity(&self) -> Result<Value> {
-        self.request("GET", "/v1/snapshots/total-used-capacity", None)
+        self.cached_get("/v1/snapshots/total-used-capacity", TTL_MODERATE)
     }
 
     pub fn get_snapshot(&self, id: u64) -> Result<Value> {
@@ -344,6 +379,89 @@ impl QumuloClient {
         if path == "/" {
             url = "/v1/files/%2F/recursive-aggregates/".to_string();
         }
-        self.request("GET", &url, None)
+        self.cached_get(&url, TTL_MODERATE)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    fn make_cache() -> ApiCache {
+        Arc::new(Mutex::new(HashMap::new()))
+    }
+
+    #[test]
+    fn test_cache_hit_within_ttl() {
+        let cache = make_cache();
+        let key = "https://host:8000/v1/cluster/settings".to_string();
+        let value = json!({"cluster_name": "test"});
+        cache
+            .lock()
+            .unwrap()
+            .insert(key.clone(), (Instant::now(), value.clone()));
+
+        // Verify the entry is present and not expired
+        let guard = cache.lock().unwrap();
+        let (inserted_at, cached_value) = guard.get(&key).unwrap();
+        assert!(inserted_at.elapsed() < TTL_SLOW);
+        assert_eq!(*cached_value, value);
+    }
+
+    #[test]
+    fn test_cache_miss_after_ttl() {
+        let cache = make_cache();
+        let key = "https://host:8000/v1/cluster/settings".to_string();
+        let value = json!({"cluster_name": "test"});
+        // Insert with a timestamp far in the past
+        let old_time = Instant::now() - Duration::from_secs(600);
+        cache
+            .lock()
+            .unwrap()
+            .insert(key.clone(), (old_time, value));
+
+        // Should be expired for TTL_SLOW (300s)
+        let guard = cache.lock().unwrap();
+        let (inserted_at, _) = guard.get(&key).unwrap();
+        assert!(inserted_at.elapsed() >= TTL_SLOW);
+    }
+
+    #[test]
+    fn test_cache_key_includes_base_url() {
+        // Different base URLs should produce different cache keys
+        let key1 = format!("{}{}", "https://cluster1:8000", "/v1/cluster/settings");
+        let key2 = format!("{}{}", "https://cluster2:8000", "/v1/cluster/settings");
+        assert_ne!(key1, key2);
+    }
+
+    #[test]
+    fn test_cache_thread_safety() {
+        let cache = make_cache();
+        let handles: Vec<_> = (0..4)
+            .map(|i| {
+                let c = cache.clone();
+                std::thread::spawn(move || {
+                    let key = format!("https://host:8000/v1/endpoint/{}", i);
+                    let value = json!({"id": i});
+                    c.lock().unwrap().insert(key.clone(), (Instant::now(), value.clone()));
+                    let guard = c.lock().unwrap();
+                    let (_, v) = guard.get(&key).unwrap();
+                    assert_eq!(*v, value);
+                })
+            })
+            .collect();
+
+        for h in handles {
+            h.join().unwrap();
+        }
+
+        assert_eq!(cache.lock().unwrap().len(), 4);
+    }
+
+    #[test]
+    fn test_ttl_constants() {
+        assert_eq!(TTL_SLOW, Duration::from_secs(300));
+        assert_eq!(TTL_MODERATE, Duration::from_secs(30));
     }
 }
