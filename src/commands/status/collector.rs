@@ -147,8 +147,6 @@ fn collect_cluster(
     timeout_secs: u64,
     watch_mode: bool,
 ) -> ClusterResult {
-    let start = Instant::now();
-
     let client = match QumuloClient::new(entry, timeout_secs) {
         Ok(c) => c,
         Err(e) => {
@@ -170,6 +168,8 @@ fn collect_cluster(
         }
     };
 
+    // Measure latency from just the /v1/version call (lightweight, near-zero server work)
+    let start = Instant::now();
     let version = match client.get_version() {
         Ok(v) => v,
         Err(e) => {
@@ -179,6 +179,7 @@ fn collect_cluster(
             };
         }
     };
+    let latency_ms = start.elapsed().as_millis() as u64;
 
     let nodes_data = match client.get_cluster_nodes() {
         Ok(v) => v,
@@ -189,8 +190,6 @@ fn collect_cluster(
             };
         }
     };
-
-    let latency_ms = start.elapsed().as_millis() as u64;
 
     // Parse node data
     let nodes_array = nodes_data.as_array().map(|a| a.as_slice()).unwrap_or(&[]);

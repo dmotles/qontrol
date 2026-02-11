@@ -1560,7 +1560,7 @@ async fn test_e2e_mixed_clusters_terminal_and_json() {
         .expect("should have onprem cluster");
     assert_eq!(onprem["reachable"], true);
     assert_eq!(onprem["stale"], false);
-    assert!(onprem["latency_ms"].as_u64().unwrap() > 0);
+    assert!(onprem["latency_ms"].as_u64().is_some(), "should have latency_ms");
     assert_eq!(onprem["cluster_type"], "on-prem");
     assert!(onprem["nodes"]["total"].as_u64().unwrap() > 0);
     assert!(onprem["capacity"]["total_bytes"].as_u64().unwrap() > 0);
