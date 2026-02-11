@@ -1,16 +1,12 @@
-use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use anyhow::{Context, Result};
 use reqwest::blocking::Client;
 use serde_json::Value;
 
+use crate::cache::DiskCache;
 use crate::config::ProfileEntry;
 use crate::error::QontrolError;
-
-/// Thread-safe in-memory API response cache: cache_key → (inserted_at, response).
-pub type ApiCache = Arc<Mutex<HashMap<String, (Instant, Value)>>>;
 
 /// TTL for slow, rarely-changing endpoints (chassis PSU, cluster settings, disk slots).
 const TTL_SLOW: Duration = Duration::from_secs(300); // 5 minutes
@@ -22,7 +18,7 @@ pub struct QumuloClient {
     client: Client,
     base_url: String,
     token: String,
-    cache: Option<ApiCache>,
+    cache: Option<DiskCache>,
 }
 
 impl QumuloClient {
@@ -51,7 +47,7 @@ impl QumuloClient {
         })
     }
 
-    pub fn new(profile: &ProfileEntry, timeout_secs: u64, cache: Option<ApiCache>) -> Result<Self> {
+    pub fn new(profile: &ProfileEntry, timeout_secs: u64, cache: Option<DiskCache>) -> Result<Self> {
         let client = Client::builder()
             .danger_accept_invalid_certs(profile.insecure)
             .timeout(Duration::from_secs(timeout_secs))
@@ -160,25 +156,20 @@ impl QumuloClient {
         serde_json::from_str(&response_body).with_context(|| "failed to parse response as JSON")
     }
 
-    /// Check cache for a GET response; if missing or expired, fetch from API and cache it.
+    /// Check disk cache for a GET response; if missing or expired, fetch from API and cache it.
     /// When no cache is configured, this is equivalent to a plain GET request.
     fn cached_get(&self, path: &str, ttl: Duration) -> Result<Value> {
-        let cache_key = format!("{}{}", self.base_url, path);
-
         if let Some(ref cache) = self.cache {
-            let guard = cache.lock().unwrap();
-            if let Some((inserted_at, value)) = guard.get(&cache_key) {
-                if inserted_at.elapsed() < ttl {
-                    return Ok(value.clone());
-                }
+            if let Some(value) = cache.get(path, ttl) {
+                tracing::debug!(path = %path, "disk cache hit");
+                return Ok(value);
             }
         }
 
         let result = self.request("GET", path, None)?;
 
         if let Some(ref cache) = self.cache {
-            let mut guard = cache.lock().unwrap();
-            guard.insert(cache_key, (Instant::now(), result.clone()));
+            cache.put(path, ttl, &result);
         }
 
         Ok(result)
@@ -390,67 +381,76 @@ impl QumuloClient {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::cache::DiskCache;
     use serde_json::json;
 
-    fn make_cache() -> ApiCache {
-        Arc::new(Mutex::new(HashMap::new()))
+    fn make_cache(uuid: &str) -> (tempfile::TempDir, DiskCache) {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let cache = DiskCache {
+            cache_dir: tmp.path().join("api"),
+            cluster_uuid: uuid.to_string(),
+        };
+        (tmp, cache)
     }
 
     #[test]
     fn test_cache_hit_within_ttl() {
-        let cache = make_cache();
-        let key = "https://host:8000/v1/cluster/settings".to_string();
+        let (_tmp, cache) = make_cache("test-cluster");
         let value = json!({"cluster_name": "test"});
-        cache
-            .lock()
-            .unwrap()
-            .insert(key.clone(), (Instant::now(), value.clone()));
+        cache.put("/v1/cluster/settings", TTL_SLOW, &value);
 
-        // Verify the entry is present and not expired
-        let guard = cache.lock().unwrap();
-        let (inserted_at, cached_value) = guard.get(&key).unwrap();
-        assert!(inserted_at.elapsed() < TTL_SLOW);
-        assert_eq!(*cached_value, value);
+        let result = cache.get("/v1/cluster/settings", TTL_SLOW);
+        assert_eq!(result, Some(value));
     }
 
     #[test]
     fn test_cache_miss_after_ttl() {
-        let cache = make_cache();
-        let key = "https://host:8000/v1/cluster/settings".to_string();
+        let (_tmp, cache) = make_cache("test-cluster");
         let value = json!({"cluster_name": "test"});
-        // Insert with a timestamp far in the past
-        let old_time = Instant::now() - Duration::from_secs(600);
-        cache.lock().unwrap().insert(key.clone(), (old_time, value));
+        cache.put("/v1/cluster/settings", TTL_SLOW, &value);
 
-        // Should be expired for TTL_SLOW (300s)
-        let guard = cache.lock().unwrap();
-        let (inserted_at, _) = guard.get(&key).unwrap();
-        assert!(inserted_at.elapsed() >= TTL_SLOW);
+        // Request with 0-second max_age — always expired
+        let result = cache.get("/v1/cluster/settings", Duration::from_secs(0));
+        assert!(result.is_none());
     }
 
     #[test]
-    fn test_cache_key_includes_base_url() {
-        // Different base URLs should produce different cache keys
-        let key1 = format!("{}{}", "https://cluster1:8000", "/v1/cluster/settings");
-        let key2 = format!("{}{}", "https://cluster2:8000", "/v1/cluster/settings");
-        assert_ne!(key1, key2);
+    fn test_cache_key_includes_cluster_uuid() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let cache1 = DiskCache {
+            cache_dir: tmp.path().join("api"),
+            cluster_uuid: "cluster1".to_string(),
+        };
+        let cache2 = DiskCache {
+            cache_dir: tmp.path().join("api"),
+            cluster_uuid: "cluster2".to_string(),
+        };
+
+        cache1.put("/v1/cluster/settings", TTL_SLOW, &json!({"from": "c1"}));
+        cache2.put("/v1/cluster/settings", TTL_SLOW, &json!({"from": "c2"}));
+
+        assert_eq!(
+            cache1.get("/v1/cluster/settings", TTL_SLOW),
+            Some(json!({"from": "c1"}))
+        );
+        assert_eq!(
+            cache2.get("/v1/cluster/settings", TTL_SLOW),
+            Some(json!({"from": "c2"}))
+        );
     }
 
     #[test]
     fn test_cache_thread_safety() {
-        let cache = make_cache();
+        let (_tmp, cache) = make_cache("test-cluster");
         let handles: Vec<_> = (0..4)
             .map(|i| {
                 let c = cache.clone();
                 std::thread::spawn(move || {
-                    let key = format!("https://host:8000/v1/endpoint/{}", i);
+                    let path = format!("/v1/endpoint/{}", i);
                     let value = json!({"id": i});
-                    c.lock()
-                        .unwrap()
-                        .insert(key.clone(), (Instant::now(), value.clone()));
-                    let guard = c.lock().unwrap();
-                    let (_, v) = guard.get(&key).unwrap();
-                    assert_eq!(*v, value);
+                    c.put(&path, TTL_SLOW, &value);
+                    let result = c.get(&path, TTL_SLOW);
+                    assert_eq!(result, Some(value));
                 })
             })
             .collect();
@@ -458,8 +458,6 @@ mod tests {
         for h in handles {
             h.join().unwrap();
         }
-
-        assert_eq!(cache.lock().unwrap().len(), 4);
     }
 
     #[test]
