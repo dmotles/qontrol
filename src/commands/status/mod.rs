@@ -18,7 +18,7 @@ use anyhow::Result;
 
 use crate::config::Config;
 
-use self::types::EnvironmentStatus;
+use self::types::{CachedClusterData, EnvironmentStatus};
 
 /// State maintained between watch mode polls for NIC throughput delta computation.
 struct WatchState {
@@ -81,6 +81,42 @@ fn extract_nic_counters(status: &EnvironmentStatus) -> HashMap<(String, u64), u6
     counters
 }
 
+/// Build an EnvironmentStatus from cached status data for the given profiles.
+/// Returns None if no cached data is available for any profile.
+fn build_cached_status(
+    config: &Config,
+    profile_filters: &[String],
+) -> Option<EnvironmentStatus> {
+    let profile_names: Vec<String> = if profile_filters.is_empty() {
+        config.profiles.keys().cloned().collect()
+    } else {
+        profile_filters.to_vec()
+    };
+
+    let cached_entries: Vec<CachedClusterData> = cache::read_all_cache(&profile_names);
+    if cached_entries.is_empty() {
+        return None;
+    }
+
+    let clusters: Vec<_> = cached_entries
+        .into_iter()
+        .map(|entry| {
+            let mut data = entry.data;
+            data.stale = true;
+            data
+        })
+        .collect();
+
+    let aggregates = collector::build_aggregates(&clusters);
+    let alerts = health::generate_alerts(&clusters, vec![]);
+
+    Some(EnvironmentStatus {
+        aggregates,
+        alerts,
+        clusters,
+    })
+}
+
 /// Entry point for the `status` command.
 #[allow(clippy::too_many_arguments)]
 pub fn run(
@@ -107,6 +143,21 @@ pub fn run(
     let mut is_first_poll = true;
 
     loop {
+        // On first poll (non-JSON, caching enabled), show cached data immediately
+        // so the user sees something while fresh data is being collected.
+        let showed_cached = if is_first_poll && !json_mode && !no_cache {
+            if let Some(cached_status) = build_cached_status(config, profiles) {
+                print!("{}", renderer::render(&cached_status));
+                let dim = console::Style::new().dim();
+                println!("{}", dim.apply_to("Refreshing..."));
+                true
+            } else {
+                false
+            }
+        } else {
+            false
+        };
+
         let (mut status, timing_report) = collector::collect_all(
             config,
             profiles,
@@ -115,9 +166,9 @@ pub fn run(
             watch,
             json_mode,
             show_timing,
-            // Suppress progress spinners on subsequent watch polls so the last
-            // render stays visible during data collection.
-            watch && !is_first_poll,
+            // Suppress progress spinners when cached data is shown (user already
+            // has data on screen) or on subsequent watch polls.
+            showed_cached || (watch && !is_first_poll),
         )?;
 
         // In watch mode, compute NIC throughput from deltas between polls
@@ -145,9 +196,9 @@ pub fn run(
                 serde_json::to_string_pretty(&json_output).unwrap_or_else(|_| "{}".to_string())
             );
         } else {
-            // On subsequent watch polls, clear terminal right before rendering so the
-            // previous output stays visible during data collection (no blank screen).
-            if watch && !is_first_poll {
+            // Clear terminal before re-rendering when cached data was shown
+            // or on subsequent watch polls (keep previous output visible during collection).
+            if showed_cached || (watch && !is_first_poll) {
                 print!("\x1B[2J\x1B[H");
             }
             print!("{}", renderer::render(&status));
@@ -383,5 +434,29 @@ mod tests {
         assert!(n.nic_throughput_bps.is_some());
 
         assert_eq!(new_counters.len(), 3);
+    }
+
+    #[test]
+    fn test_cached_status_marks_clusters_stale() {
+        // Simulate what build_cached_status does: take cached cluster data,
+        // mark stale, and build aggregates.
+        let cluster = make_cluster(
+            "test",
+            vec![make_node(1, Some(1_000_000), Some(200_000_000_000))],
+        );
+        assert!(!cluster.stale);
+
+        let mut stale_cluster = cluster;
+        stale_cluster.stale = true;
+
+        let aggregates = collector::build_aggregates(&[stale_cluster.clone()]);
+        let status = EnvironmentStatus {
+            aggregates,
+            alerts: vec![],
+            clusters: vec![stale_cluster],
+        };
+
+        assert!(status.clusters[0].stale);
+        assert_eq!(status.aggregates.cluster_count, 1);
     }
 }

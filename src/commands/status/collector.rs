@@ -1054,7 +1054,7 @@ fn sum_activity_rates(resp: &Value, activity_type: &str) -> f64 {
         .unwrap_or(0.0)
 }
 
-fn build_aggregates(clusters: &[ClusterStatus]) -> Aggregates {
+pub(super) fn build_aggregates(clusters: &[ClusterStatus]) -> Aggregates {
     let reachable_count = clusters.iter().filter(|c| c.reachable).count();
     let total_nodes: usize = clusters.iter().map(|c| c.nodes.total).sum();
     let online_nodes: usize = clusters.iter().map(|c| c.nodes.online).sum();

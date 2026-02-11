@@ -31,6 +31,22 @@ pub fn read_cache(profile: &str) -> Option<CachedClusterData> {
     read_cache_at(&cache_path().ok()?, profile)
 }
 
+/// Read cached data for all given profiles, returning only those with cached entries.
+pub fn read_all_cache(profiles: &[String]) -> Vec<CachedClusterData> {
+    let path = match cache_path() {
+        Ok(p) => p,
+        Err(_) => return Vec::new(),
+    };
+    read_all_cache_at(&path, profiles)
+}
+
+fn read_all_cache_at(path: &Path, profiles: &[String]) -> Vec<CachedClusterData> {
+    profiles
+        .iter()
+        .filter_map(|p| read_cache_at(path, p))
+        .collect()
+}
+
 fn write_cache_at(path: &Path, profile: &str, data: &ClusterStatus) -> Result<()> {
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)
@@ -163,5 +179,44 @@ mod tests {
         let cached2 = read_cache_at(&path, "profile2").expect("profile2 should exist");
         assert_eq!(cached1.data.name, "profile1-cluster");
         assert_eq!(cached2.data.name, "profile2-cluster");
+    }
+
+    #[test]
+    fn test_read_all_cache_returns_matching() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path = tmp.path().join("status-cache.json");
+
+        write_cache_at(&path, "a", &make_test_cluster("a")).unwrap();
+        write_cache_at(&path, "b", &make_test_cluster("b")).unwrap();
+        write_cache_at(&path, "c", &make_test_cluster("c")).unwrap();
+
+        let profiles = vec!["a".to_string(), "c".to_string()];
+        let results = read_all_cache_at(&path, &profiles);
+        assert_eq!(results.len(), 2);
+        assert_eq!(results[0].profile, "a");
+        assert_eq!(results[1].profile, "c");
+    }
+
+    #[test]
+    fn test_read_all_cache_skips_missing() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path = tmp.path().join("status-cache.json");
+
+        write_cache_at(&path, "a", &make_test_cluster("a")).unwrap();
+
+        let profiles = vec!["a".to_string(), "nonexistent".to_string()];
+        let results = read_all_cache_at(&path, &profiles);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].profile, "a");
+    }
+
+    #[test]
+    fn test_read_all_cache_empty_when_no_file() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path = tmp.path().join("nonexistent.json");
+
+        let profiles = vec!["a".to_string()];
+        let results = read_all_cache_at(&path, &profiles);
+        assert!(results.is_empty());
     }
 }
