@@ -112,11 +112,15 @@ pub fn run(
     };
 
     let mut watch_state: Option<WatchState> = None;
+    let mut is_first_poll = true;
 
     loop {
         let (mut status, timing_report) = collector::collect_all(
             config, profiles, timeout_secs, no_cache, watch, json_mode, show_timing,
             api_cache.clone(),
+            // Suppress progress spinners on subsequent watch polls so the last
+            // render stays visible during data collection.
+            watch && !is_first_poll,
         )?;
 
         // In watch mode, compute NIC throughput from deltas between polls
@@ -144,6 +148,11 @@ pub fn run(
                 serde_json::to_string_pretty(&json_output).unwrap_or_else(|_| "{}".to_string())
             );
         } else {
+            // On subsequent watch polls, clear terminal right before rendering so the
+            // previous output stays visible during data collection (no blank screen).
+            if watch && !is_first_poll {
+                print!("\x1B[2J\x1B[H");
+            }
             print!("{}", renderer::render(&status));
         }
 
@@ -177,10 +186,7 @@ pub fn run(
             return Ok(());
         }
 
-        // Clear terminal before next render
-        if !json_mode {
-            print!("\x1B[2J\x1B[H");
-        }
+        is_first_poll = false;
     }
 
     Ok(())

@@ -24,8 +24,9 @@ type NicStatsMap =
 fn create_progress_spinners(
     profile_names: &[(String, ProfileEntry)],
     json_mode: bool,
+    suppress: bool,
 ) -> Option<(MultiProgress, Vec<ProgressBar>)> {
-    if json_mode || !std::io::stderr().is_terminal() {
+    if json_mode || suppress || !std::io::stderr().is_terminal() {
         return None;
     }
 
@@ -62,6 +63,7 @@ pub fn collect_all(
     json_mode: bool,
     record_timing: bool,
     api_cache: Option<ApiCache>,
+    suppress_progress: bool,
 ) -> Result<(EnvironmentStatus, Option<TimingReport>)> {
     // Determine which profiles to query
     let profiles: Vec<(String, ProfileEntry)> = if profile_filters.is_empty() {
@@ -86,8 +88,8 @@ pub fn collect_all(
         anyhow::bail!("no matching profiles found — add profiles with `qontrol profile add`");
     }
 
-    // Set up progress spinners (skipped for non-TTY / json mode)
-    let progress = create_progress_spinners(&profiles, json_mode);
+    // Set up progress spinners (skipped for non-TTY / json mode / subsequent watch polls)
+    let progress = create_progress_spinners(&profiles, json_mode, suppress_progress);
 
     // Spawn one thread per cluster for parallel collection
     let results: Vec<(ClusterResult, Vec<ApiCallTiming>, u64)> = std::thread::scope(|s| {
