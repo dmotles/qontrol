@@ -5,7 +5,8 @@ use anyhow::Result;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use serde_json::Value;
 
-use crate::client::{ApiCache, QumuloClient};
+use crate::cache::DiskCache;
+use crate::client::QumuloClient;
 use crate::config::{Config, ProfileEntry};
 
 use super::cache;
@@ -63,7 +64,6 @@ pub fn collect_all(
     watch_mode: bool,
     json_mode: bool,
     record_timing: bool,
-    api_cache: Option<ApiCache>,
     suppress_progress: bool,
 ) -> Result<(EnvironmentStatus, Option<TimingReport>)> {
     // Determine which profiles to query
@@ -101,7 +101,6 @@ pub fn collect_all(
                 let name = name.clone();
                 let entry = entry.clone();
                 let spinner = progress.as_ref().map(|(_, spinners)| spinners[idx].clone());
-                let thread_cache = api_cache.clone();
                 s.spawn(move || {
                     let on_progress = |msg: &str| {
                         if let Some(ref pb) = spinner {
@@ -114,9 +113,9 @@ pub fn collect_all(
                         &entry,
                         timeout_secs,
                         watch_mode,
+                        no_cache,
                         &on_progress,
                         record_timing,
-                        thread_cache,
                     );
                     let wall_ms = wall_start.elapsed().as_millis() as u64;
                     // Finish spinner based on result
@@ -265,9 +264,9 @@ fn collect_cluster(
     entry: &ProfileEntry,
     timeout_secs: u64,
     watch_mode: bool,
+    no_cache: bool,
     on_progress: &dyn Fn(&str),
     record_timing: bool,
-    api_cache: Option<ApiCache>,
 ) -> (ClusterResult, Vec<ApiCallTiming>) {
     let mut timings: Vec<ApiCallTiming> = Vec::new();
     let profile_str = profile.to_string();
@@ -288,7 +287,20 @@ fn collect_cluster(
     }
 
     on_progress("connecting...");
-    let client = match QumuloClient::new(entry, timeout_secs, api_cache) {
+
+    // Build disk cache if caching is enabled and we have a UUID to key by.
+    // ensure_cluster_uuids() runs before collect_all(), so most profiles have UUIDs.
+    let disk_cache: Option<DiskCache> = if !no_cache {
+        entry
+            .cluster_uuid
+            .as_deref()
+            .filter(|uuid| !uuid.is_empty())
+            .and_then(|uuid| DiskCache::new(uuid).ok())
+    } else {
+        None
+    };
+
+    let client = match QumuloClient::new(entry, timeout_secs, disk_cache) {
         Ok(c) => c,
         Err(e) => {
             return (
