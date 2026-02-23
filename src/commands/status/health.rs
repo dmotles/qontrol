@@ -24,6 +24,7 @@ fn generate_cluster_alerts(cluster: &ClusterStatus, alerts: &mut Vec<Alert>) {
     check_node_offline(cluster, alerts);
     check_data_at_risk(cluster, alerts);
     check_disk_health(cluster, alerts);
+    check_psu_health(cluster, alerts);
     check_protection_degraded(cluster, alerts);
     check_capacity_projection(cluster, alerts);
 }
@@ -96,6 +97,31 @@ fn check_disk_health(cluster: &ClusterStatus, alerts: &mut Vec<Alert>) {
             message: format!("{} disk(s) unhealthy ({})", count, details.join("; ")),
             category: "disk_unhealthy".to_string(),
         });
+    }
+}
+
+/// Unhealthy PSUs: warning with detail (node, location).
+fn check_psu_health(cluster: &ClusterStatus, alerts: &mut Vec<Alert>) {
+    if cluster.health.psus_unhealthy == 0 {
+        return;
+    }
+
+    if cluster.health.unhealthy_psu_details.is_empty() {
+        alerts.push(Alert {
+            severity: AlertSeverity::Warning,
+            cluster: cluster.name.clone(),
+            message: format!("{} PSU(s) unhealthy", cluster.health.psus_unhealthy),
+            category: "psu_unhealthy".to_string(),
+        });
+    } else {
+        for psu in &cluster.health.unhealthy_psu_details {
+            alerts.push(Alert {
+                severity: AlertSeverity::Warning,
+                cluster: cluster.name.clone(),
+                message: format!("PSU issue (node {}, {})", psu.node_id, psu.location),
+                category: "psu_unhealthy".to_string(),
+            });
+        }
     }
 }
 
@@ -337,6 +363,75 @@ mod tests {
         let cluster = make_cluster("healthy");
         let alerts = generate_alerts(&[cluster], vec![]);
         assert!(!alerts.iter().any(|a| a.category == "disk_unhealthy"));
+    }
+
+    // ── PSU health alerts ───────────────────────────────────────────
+
+    #[test]
+    fn test_psu_unhealthy_with_details() {
+        let mut cluster = make_cluster("test");
+        cluster.health.psus_unhealthy = 1;
+        cluster.health.unhealthy_psu_details = vec![UnhealthyPsu {
+            node_id: 2,
+            location: "right".to_string(),
+            name: "PSU1".to_string(),
+            state: "FAILED".to_string(),
+        }];
+
+        let alerts = generate_alerts(&[cluster], vec![]);
+        let psu_alert = alerts.iter().find(|a| a.category == "psu_unhealthy");
+        assert!(psu_alert.is_some());
+        assert_eq!(psu_alert.unwrap().severity, AlertSeverity::Warning);
+        assert!(psu_alert.unwrap().message.contains("node 2"));
+        assert!(psu_alert.unwrap().message.contains("right"));
+    }
+
+    #[test]
+    fn test_multiple_psus_unhealthy() {
+        let mut cluster = make_cluster("test");
+        cluster.health.psus_unhealthy = 2;
+        cluster.health.unhealthy_psu_details = vec![
+            UnhealthyPsu {
+                node_id: 1,
+                location: "left".to_string(),
+                name: "PSU2".to_string(),
+                state: "DEGRADED".to_string(),
+            },
+            UnhealthyPsu {
+                node_id: 3,
+                location: "right".to_string(),
+                name: "PSU1".to_string(),
+                state: "FAILED".to_string(),
+            },
+        ];
+
+        let alerts = generate_alerts(&[cluster], vec![]);
+        let psu_alerts: Vec<_> = alerts
+            .iter()
+            .filter(|a| a.category == "psu_unhealthy")
+            .collect();
+        assert_eq!(psu_alerts.len(), 2);
+        assert!(psu_alerts[0].message.contains("node 1"));
+        assert!(psu_alerts[1].message.contains("node 3"));
+    }
+
+    #[test]
+    fn test_psu_unhealthy_fallback_no_details() {
+        let mut cluster = make_cluster("test");
+        cluster.health.psus_unhealthy = 1;
+        // No details
+
+        let alerts = generate_alerts(&[cluster], vec![]);
+        let psu_alert = alerts.iter().find(|a| a.category == "psu_unhealthy");
+        assert!(psu_alert.is_some());
+        assert!(psu_alert.unwrap().message.contains("1 PSU(s) unhealthy"));
+    }
+
+    #[test]
+    fn test_no_unhealthy_psus_no_alert() {
+        let cluster = make_cluster("healthy");
+        let alerts = generate_alerts(&[cluster], vec![]);
+        assert!(!alerts.iter().any(|a| a.category == "psu_unhealthy"));
     }
 
     // ── Protection degraded alerts ──────────────────────────────────
@@ -590,6 +685,14 @@ mod tests {
             disk_type: "HDD".to_string(),
             state: "unhealthy".to_string(),
         }];
+        // Unhealthy PSU
+        cluster.health.psus_unhealthy = 1;
+        cluster.health.unhealthy_psu_details = vec![UnhealthyPsu {
+            node_id: 1,
+            location: "right".to_string(),
+            name: "PSU1".to_string(),
+            state: "FAILED".to_string(),
+        }];
         // Protection degraded
         cluster.health.remaining_node_failures = Some(0);
         // Capacity warning
@@ -606,6 +709,7 @@ mod tests {
         assert!(categories.contains(&"node_offline"));
         assert!(categories.contains(&"data_at_risk"));
         assert!(categories.contains(&"disk_unhealthy"));
+        assert!(categories.contains(&"psu_unhealthy"));
         assert!(categories.contains(&"protection_degraded"));
         assert!(categories.contains(&"capacity_projection"));
 
