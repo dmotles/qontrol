@@ -190,7 +190,7 @@ impl QumuloClient {
     }
 
     pub fn get_cluster_nodes(&self) -> Result<Value> {
-        self.request("GET", "/v1/cluster/nodes/", None)
+        self.cached_get("/v1/cluster/nodes/", TTL_SLOW)
     }
 
     pub fn get_file_system(&self) -> Result<Value> {
@@ -235,7 +235,7 @@ impl QumuloClient {
     // Network endpoints
 
     pub fn get_network_connections(&self) -> Result<Value> {
-        self.request("GET", "/v2/network/connections/", None)
+        self.cached_get("/v2/network/connections/", TTL_MODERATE)
     }
 
     pub fn get_network_status(&self) -> Result<Value> {
