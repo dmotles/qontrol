@@ -865,21 +865,10 @@ fn fetch_nic_stats_per_node(
         return result;
     }
 
-    // Sleep 1 second then make second call for throughput delta
-    std::thread::sleep(std::time::Duration::from_secs(1));
-
-    let data2 = match client.get_network_status() {
-        Ok(v) => v,
-        Err(e) => {
-            tracing::warn!(error = %e, "failed to fetch network status (2nd call)");
-            // Fall back to first call data only (no throughput)
-            parse_nic_data_single(&data1, is_cloud, &mut result);
-            return result;
-        }
-    };
-
-    // Parse both calls and compute throughput delta
-    parse_nic_data_delta(&data1, &data2, is_cloud, &mut result);
+    // One-shot / first render: return link speed only, skip the 1-second sleep
+    // and second NIC call. Throughput will show as "—" on first render.
+    // This eliminates the single biggest contributor to fleet status latency.
+    parse_nic_data_single(&data1, is_cloud, &mut result);
 
     result
 }
@@ -925,6 +914,7 @@ fn parse_nic_data_single_with_bytes(data: &Value, is_cloud: bool, result: &mut N
 }
 
 /// Parse NIC data from two calls and compute throughput delta.
+#[cfg(test)]
 fn parse_nic_data_delta(data1: &Value, data2: &Value, is_cloud: bool, result: &mut NicStatsMap) {
     let nodes1 = match data1.as_array() {
         Some(a) => a,
