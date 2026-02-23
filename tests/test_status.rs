@@ -902,9 +902,9 @@ async fn test_status_file_stats_from_fixtures() {
     let cluster = &json["clusters"][0];
     let files = &cluster["files"];
 
-    // gravytrain: sum of num_files across recursive aggregates = 1,807,976,645
+    // gravytrain: total_files from aggregates = 1,807,976,645
     assert_eq!(files["total_files"].as_u64().unwrap(), 1_807_976_645);
-    // gravytrain: sum of num_directories = 219,679,366
+    // gravytrain: total_directories from aggregates = 219,679,366
     assert_eq!(files["total_directories"].as_u64().unwrap(), 219_679_366);
     // gravytrain: 2147 snapshots
     assert_eq!(files["total_snapshots"].as_u64().unwrap(), 2147);
@@ -1034,9 +1034,9 @@ async fn test_status_partial_activity_failure() {
     mts.mount_status_fixture(
         "gt",
         "gravytrain",
-        "recursive_aggregates",
+        "aggregates",
         "GET",
-        "/v1/files/%2F/recursive-aggregates/",
+        "/v1/files/%2F/aggregates/",
     )
     .await;
     mts.mount_status_fixture(
@@ -1215,7 +1215,7 @@ async fn test_status_watch_mode_nic_delta_between_polls() {
     ] {
         mts.mount_fixture("nic_delta", fixture).await;
     }
-    mts.mount_empty_response("nic_delta", "GET", "/v1/files/%2F/recursive-aggregates/")
+    mts.mount_empty_response("nic_delta", "GET", "/v1/files/%2F/aggregates/")
         .await;
     mts.mount_empty_response("nic_delta", "GET", "/v2/snapshots/")
         .await;

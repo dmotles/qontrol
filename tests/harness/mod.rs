@@ -287,7 +287,7 @@ base_url = "http://127.0.0.1:{port}"
             self.mount_fixture(profile, fixture).await;
         }
         // Mount stubs for new endpoints so existing tests don't break
-        self.mount_empty_response(profile, "GET", "/v1/files/%2F/recursive-aggregates/")
+        self.mount_empty_response(profile, "GET", "/v1/files/%2F/aggregates/")
             .await;
         self.mount_empty_response(profile, "GET", "/v2/snapshots/")
             .await;
@@ -418,13 +418,13 @@ base_url = "http://127.0.0.1:{port}"
         self.mount_status_fixture(profile, cluster, "file_system", "GET", "/v1/file-system")
             .await;
 
-        // File stats
+        // File stats (aggregates with max-entries=0, returns root inode totals)
         self.mount_status_fixture(
             profile,
             cluster,
-            "recursive_aggregates",
+            "aggregates",
             "GET",
-            "/v1/files/%2F/recursive-aggregates/",
+            "/v1/files/%2F/aggregates/",
         )
         .await;
 

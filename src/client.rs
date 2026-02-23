@@ -322,17 +322,17 @@ impl QumuloClient {
     }
 
     /// Get aggregated data for a path (file count, size totals, etc.)
-    #[allow(dead_code)]
+    /// Uses max-entries=0 to return only the root inode totals without walking children.
     pub fn get_file_aggregates(&self, path: &str) -> Result<Value> {
         let encoded = urlencoding::encode(path);
         let mut url = format!(
-            "/v1/files/%2F{}/aggregates/",
+            "/v1/files/%2F{}/aggregates/?max-entries=0",
             encoded.trim_start_matches("%2F")
         );
         if path == "/" {
-            url = "/v1/files/%2F/aggregates/".to_string();
+            url = "/v1/files/%2F/aggregates/?max-entries=0".to_string();
         }
-        self.request("GET", &url, None)
+        self.cached_get(&url, TTL_SLOW)
     }
 
     /// Fetch all directory entries by paginating through all pages.

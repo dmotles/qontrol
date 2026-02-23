@@ -631,23 +631,14 @@ fn fetch_activity_sum(client: &QumuloClient, activity_type: &str) -> f64 {
 fn fetch_file_stats(client: &QumuloClient) -> FileStats {
     let mut stats = FileStats::default();
 
-    // File/directory counts from recursive aggregates
-    match client.get_file_recursive_aggregates("/") {
+    // File/directory counts from root inode aggregates (no tree walk)
+    match client.get_file_aggregates("/") {
         Ok(agg) => {
-            // Response is an array of pages; each page has a "files" array
-            if let Some(pages) = agg.as_array() {
-                for page in pages {
-                    if let Some(files) = page["files"].as_array() {
-                        for entry in files {
-                            stats.total_files += parse_string_u64(&entry["num_files"]);
-                            stats.total_directories += parse_string_u64(&entry["num_directories"]);
-                        }
-                    }
-                }
-            }
+            stats.total_files = parse_string_u64(&agg["total_files"]);
+            stats.total_directories = parse_string_u64(&agg["total_directories"]);
         }
         Err(e) => {
-            tracing::warn!(error = %e, "failed to fetch recursive aggregates");
+            tracing::warn!(error = %e, "failed to fetch file aggregates");
         }
     }
 
@@ -1015,22 +1006,12 @@ fn extract_bond0_stats(node: &Value) -> (Option<u64>, u64) {
     (link_speed_bps, total_bytes)
 }
 
-/// Parse a recursive-aggregates API response and sum file/directory counts.
-/// Response is an array of pages, each containing a "files" array.
+/// Parse a flat aggregates API response (max-entries=0) for file/directory counts.
+/// Response has top-level "total_files" and "total_directories" fields.
 #[cfg(test)]
-fn parse_recursive_aggregates(agg: &Value) -> (u64, u64) {
-    let mut total_files = 0u64;
-    let mut total_dirs = 0u64;
-    if let Some(pages) = agg.as_array() {
-        for page in pages {
-            if let Some(files) = page["files"].as_array() {
-                for entry in files {
-                    total_files += parse_string_u64(&entry["num_files"]);
-                    total_dirs += parse_string_u64(&entry["num_directories"]);
-                }
-            }
-        }
-    }
+fn parse_aggregates(agg: &Value) -> (u64, u64) {
+    let total_files = parse_string_u64(&agg["total_files"]);
+    let total_dirs = parse_string_u64(&agg["total_directories"]);
     (total_files, total_dirs)
 }
 
@@ -1605,56 +1586,52 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_recursive_aggregates_basic() {
-        let agg = json!([{
-            "files": [
-                { "num_files": "100", "num_directories": "10" },
-                { "num_files": "200", "num_directories": "20" }
-            ]
-        }]);
-        let (files, dirs) = parse_recursive_aggregates(&agg);
+    fn test_parse_aggregates_basic() {
+        let agg = json!({
+            "total_files": "300",
+            "total_directories": "30"
+        });
+        let (files, dirs) = parse_aggregates(&agg);
         assert_eq!(files, 300);
         assert_eq!(dirs, 30);
     }
 
     #[test]
-    fn test_parse_recursive_aggregates_empty() {
-        let agg = json!([{ "files": [] }]);
-        let (files, dirs) = parse_recursive_aggregates(&agg);
+    fn test_parse_aggregates_empty() {
+        let agg = json!({});
+        let (files, dirs) = parse_aggregates(&agg);
         assert_eq!(files, 0);
         assert_eq!(dirs, 0);
     }
 
     #[test]
-    fn test_parse_recursive_aggregates_missing_fields() {
-        let agg = json!([{ "files": [{ "num_files": "50" }] }]);
-        let (files, dirs) = parse_recursive_aggregates(&agg);
+    fn test_parse_aggregates_missing_fields() {
+        let agg = json!({ "total_files": "50" });
+        let (files, dirs) = parse_aggregates(&agg);
         assert_eq!(files, 50);
         assert_eq!(dirs, 0);
     }
 
     #[test]
-    fn test_parse_recursive_aggregates_large_numbers() {
+    fn test_parse_aggregates_large_numbers() {
         // Petabyte-scale file counts
-        let agg = json!([{
-            "files": [
-                { "num_files": "1807976645", "num_directories": "219679366" }
-            ]
-        }]);
-        let (files, dirs) = parse_recursive_aggregates(&agg);
+        let agg = json!({
+            "total_files": "1807976645",
+            "total_directories": "219679366"
+        });
+        let (files, dirs) = parse_aggregates(&agg);
         assert_eq!(files, 1_807_976_645);
         assert_eq!(dirs, 219_679_366);
     }
 
     #[test]
-    fn test_parse_recursive_aggregates_numeric_values() {
+    fn test_parse_aggregates_numeric_values() {
         // Handle numeric values (not just strings)
-        let agg = json!([{
-            "files": [
-                { "num_files": 42, "num_directories": 7 }
-            ]
-        }]);
-        let (files, dirs) = parse_recursive_aggregates(&agg);
+        let agg = json!({
+            "total_files": 42,
+            "total_directories": 7
+        });
+        let (files, dirs) = parse_aggregates(&agg);
         assert_eq!(files, 42);
         assert_eq!(dirs, 7);
     }
