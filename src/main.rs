@@ -11,8 +11,8 @@ use clap::Parser;
 use tracing_subscriber::EnvFilter;
 
 use cli::{
-    ApiCommands, Cli, ClusterCommands, Commands, FleetCommands, FsCommands, ProfileCommands,
-    SnapshotCommands,
+    ApiCommands, Cli, ClusterCommands, Commands, FleetCommands, FleetHwCommands,
+    FleetHwPsuCommands, FsCommands, HwCommands, HwPsuCommands, ProfileCommands, SnapshotCommands,
 };
 use client::QumuloClient;
 use config::{ensure_cluster_uuids, load_config, resolve_profile};
@@ -151,7 +151,33 @@ fn run(cli: Cli) -> Result<()> {
                     timing,
                 )
             }
+            FleetCommands::Hw { command } => match command {
+                FleetHwCommands::Psu { command } => match command {
+                    FleetHwPsuCommands::Check { profiles, verbose } => {
+                        let config = load_config()?;
+                        commands::hw::psu::fleet_check(
+                            &config,
+                            &profiles,
+                            cli.global_opts.timeout,
+                            cli.global_opts.json,
+                            verbose,
+                        )
+                    }
+                },
+            },
         },
+        Commands::Hw { command } => {
+            let config = load_config()?;
+            let (_, profile) = resolve_profile(&config, &cli.profile)?;
+            let client = QumuloClient::new(&profile, cli.global_opts.timeout, None)?;
+            match command {
+                HwCommands::Psu { command } => match command {
+                    HwPsuCommands::Check => {
+                        commands::hw::psu::check(&client, cli.global_opts.json)
+                    }
+                },
+            }
+        }
         Commands::Fs { command } => {
             let config = load_config()?;
             let (_, profile) = resolve_profile(&config, &cli.profile)?;

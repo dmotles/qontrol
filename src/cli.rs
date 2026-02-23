@@ -65,6 +65,11 @@ pub enum Commands {
         #[command(subcommand)]
         command: FleetCommands,
     },
+    /// Hardware health checks
+    Hw {
+        #[command(subcommand)]
+        command: HwCommands,
+    },
 }
 
 #[derive(Subcommand)]
@@ -88,6 +93,48 @@ pub enum FleetCommands {
         #[arg(long)]
         timing: bool,
     },
+    /// Fleet-wide hardware health checks
+    Hw {
+        #[command(subcommand)]
+        command: FleetHwCommands,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum FleetHwCommands {
+    /// Fleet-wide PSU health checks
+    Psu {
+        #[command(subcommand)]
+        command: FleetHwPsuCommands,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum FleetHwPsuCommands {
+    /// Check PSU health across all configured clusters
+    Check {
+        /// Filter to specific profiles (repeatable)
+        #[arg(long = "cluster", short = 'c', num_args = 1)]
+        profiles: Vec<String>,
+        /// Show per-node PSU details for all clusters
+        #[arg(short, long)]
+        verbose: bool,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum HwCommands {
+    /// PSU health checks
+    Psu {
+        #[command(subcommand)]
+        command: HwPsuCommands,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum HwPsuCommands {
+    /// Check PSU health for the target cluster
+    Check,
 }
 
 #[derive(Subcommand)]
