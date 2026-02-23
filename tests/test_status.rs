@@ -318,7 +318,6 @@ async fn test_status_healthy_cluster_health_data() {
 
     // All healthy — no issues
     assert_eq!(health["disks_unhealthy"], 0);
-    assert_eq!(health["psus_unhealthy"], 0);
     assert_eq!(health["data_at_risk"], false);
 
     // Protection data populated
@@ -332,7 +331,6 @@ async fn test_status_healthy_cluster_health_data() {
         !alerts.iter().any(|a| {
             let cat = a["category"].as_str().unwrap_or("");
             cat == "disk_unhealthy"
-                || cat == "psu_unhealthy"
                 || cat == "data_at_risk"
                 || cat == "protection_degraded"
         }),
@@ -585,59 +583,6 @@ async fn test_status_partial_health_failure() {
     assert!(clusters[0]["health"]["remaining_node_failures"].is_number());
 }
 
-/// Test: cloud cluster (empty PSU array) → no PSU alerts.
-#[tokio::test]
-async fn test_status_cloud_cluster_empty_psus() {
-    let mts = harness::MultiTestServer::start(&["cloud"]).await;
-
-    // Mount standard fixtures
-    mts.mount_fixture("cloud", "cluster_settings").await;
-    mts.mount_fixture("cloud", "version").await;
-    mts.mount_fixture("cloud", "filesystem").await;
-    mts.mount_fixture("cloud", "analytics_activity").await;
-    mts.mount_fixture("cloud", "cluster_slots").await;
-    mts.mount_fixture("cloud", "cluster_protection_status")
-        .await;
-    mts.mount_fixture("cloud", "cluster_restriper_status").await;
-
-    // Cloud nodes
-    let cloud_nodes = r#"[
-        {"id": 1, "node_name": "cloud-1", "node_status": "online", "model_number": "AWS", "serial_number": "i-001"},
-        {"id": 2, "node_name": "cloud-2", "node_status": "online", "model_number": "AWS", "serial_number": "i-002"}
-    ]"#;
-    mts.mount_raw("cloud", "cluster_nodes", cloud_nodes).await;
-
-    // Empty PSU array (cloud behavior)
-    let cloud_chassis = r#"[
-        {"id": 1, "light_visible": false, "psu_statuses": []},
-        {"id": 2, "light_visible": false, "psu_statuses": []}
-    ]"#;
-    mts.mount_raw("cloud", "cluster_chassis", cloud_chassis)
-        .await;
-
-    let output = mts
-        .command()
-        .args(["fleet", "status", "--json", "--no-cache"])
-        .output()
-        .expect("failed to execute");
-
-    assert!(output.status.success());
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let json: serde_json::Value = serde_json::from_str(&stdout).expect("invalid JSON output");
-
-    let cluster = &json["clusters"][0];
-    assert_eq!(cluster["health"]["psus_unhealthy"], 0);
-    assert_eq!(cluster["cluster_type"], "cnq-aws");
-
-    let alerts = json["alerts"].as_array().expect("alerts");
-    assert!(
-        !alerts
-            .iter()
-            .any(|a| a["category"].as_str() == Some("psu_unhealthy")),
-        "cloud cluster should not have PSU alerts"
-    );
-}
-
 /// Test: healthy cluster with real recorded fixtures from gravytrain.
 #[tokio::test]
 async fn test_status_gravytrain_fixtures_health() {
@@ -673,64 +618,12 @@ async fn test_status_gravytrain_fixtures_health() {
     let cluster = &json["clusters"][0];
     let health = &cluster["health"];
 
-    // Gravytrain is healthy — all disks healthy, all PSUs good, no data at risk
+    // Gravytrain is healthy — all disks healthy, no data at risk
     assert_eq!(health["disks_unhealthy"], 0);
-    assert_eq!(health["psus_unhealthy"], 0);
     assert_eq!(health["data_at_risk"], false);
     assert_eq!(health["remaining_node_failures"], 1);
     assert_eq!(health["remaining_drive_failures"], 2);
     assert_eq!(health["protection_type"], "PROTECTION_SYSTEM_TYPE_EC");
-}
-
-/// Test: PSU unhealthy alert is generated.
-#[tokio::test]
-async fn test_status_unhealthy_psu_alert() {
-    let mts = harness::MultiTestServer::start(&["psu_issue"]).await;
-
-    mts.mount_fixture("psu_issue", "cluster_settings").await;
-    mts.mount_fixture("psu_issue", "version").await;
-    mts.mount_fixture("psu_issue", "cluster_nodes").await;
-    mts.mount_fixture("psu_issue", "filesystem").await;
-    mts.mount_fixture("psu_issue", "analytics_activity").await;
-    mts.mount_fixture("psu_issue", "cluster_slots").await;
-    mts.mount_fixture("psu_issue", "cluster_protection_status")
-        .await;
-    mts.mount_fixture("psu_issue", "cluster_restriper_status")
-        .await;
-
-    // Mount chassis with one bad PSU
-    let bad_psu_chassis = r#"[
-        {
-            "id": 1,
-            "light_visible": false,
-            "psu_statuses": [
-                {"location": "left", "name": "PSU2", "state": "GOOD"},
-                {"location": "right", "name": "PSU1", "state": "FAILED"}
-            ]
-        }
-    ]"#;
-    mts.mount_raw("psu_issue", "cluster_chassis", bad_psu_chassis)
-        .await;
-
-    let output = mts
-        .command()
-        .args(["fleet", "status", "--json", "--no-cache"])
-        .output()
-        .expect("failed to execute");
-
-    assert!(output.status.success());
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let json: serde_json::Value = serde_json::from_str(&stdout).expect("invalid JSON output");
-
-    let cluster = &json["clusters"][0];
-    assert_eq!(cluster["health"]["psus_unhealthy"], 1);
-
-    let alerts = json["alerts"].as_array().expect("alerts");
-    let psu_alert = alerts
-        .iter()
-        .find(|a| a["category"].as_str() == Some("psu_unhealthy"));
-    assert!(psu_alert.is_some(), "should have psu_unhealthy alert");
-    assert_eq!(psu_alert.unwrap()["severity"], "warning");
 }
 
 // ── Network data collection tests ─────────────────────────────────────────────
@@ -1592,7 +1485,6 @@ async fn test_e2e_mixed_clusters_terminal_and_json() {
     for cluster in [onprem, cloud] {
         let health = &cluster["health"];
         assert!(health.get("disks_unhealthy").is_some());
-        assert!(health.get("psus_unhealthy").is_some());
         assert!(health.get("data_at_risk").is_some());
         assert!(health.get("remaining_node_failures").is_some());
         assert!(health.get("remaining_drive_failures").is_some());

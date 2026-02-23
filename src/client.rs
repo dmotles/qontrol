@@ -220,6 +220,7 @@ impl QumuloClient {
         self.cached_get("/v1/cluster/slots/", TTL_SLOW)
     }
 
+    #[allow(dead_code)] // Preserved for dedicated PSU commands (separate bead)
     pub fn get_cluster_chassis(&self) -> Result<Value> {
         self.cached_get("/v1/cluster/nodes/chassis/", TTL_SLOW)
     }

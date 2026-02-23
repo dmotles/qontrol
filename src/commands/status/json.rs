@@ -122,7 +122,6 @@ pub struct JsonFiles {
 #[derive(Debug, Serialize)]
 pub struct JsonHealth {
     pub disks_unhealthy: usize,
-    pub psus_unhealthy: usize,
     pub data_at_risk: bool,
     pub remaining_node_failures: Option<u64>,
     pub remaining_drive_failures: Option<u64>,
@@ -241,7 +240,6 @@ fn convert_cluster(c: &ClusterStatus) -> JsonCluster {
         },
         health: JsonHealth {
             disks_unhealthy: c.health.disks_unhealthy,
-            psus_unhealthy: c.health.psus_unhealthy,
             data_at_risk: c.health.data_at_risk,
             remaining_node_failures: c.health.remaining_node_failures,
             remaining_drive_failures: c.health.remaining_drive_failures,
@@ -742,7 +740,6 @@ mod tests {
         assert!(health.get("issues").is_none());
         // Spec fields are present
         assert_eq!(health["disks_unhealthy"], 0);
-        assert_eq!(health["psus_unhealthy"], 0);
         assert_eq!(health["data_at_risk"], false);
         assert_eq!(health["remaining_node_failures"], 1);
         assert_eq!(health["remaining_drive_failures"], 2);

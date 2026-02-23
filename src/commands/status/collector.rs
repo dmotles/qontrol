@@ -439,7 +439,6 @@ fn collect_cluster(
     // Fetch health data — each individually wrapped for error isolation
     on_progress("fetching health data...");
     let (unhealthy_disks, disk_details) = timed!("get_cluster_slots", fetch_disk_health(&client));
-    let (unhealthy_psus, psu_details) = timed!("get_cluster_chassis", fetch_psu_health(&client));
     let (remaining_node_failures, remaining_drive_failures, protection_type) =
         timed!("get_protection_status", fetch_protection_status(&client));
     let data_at_risk = timed!("get_restriper_status", fetch_restriper_status(&client));
@@ -461,14 +460,6 @@ fn collect_cluster(
             issues.push(format!(
                 "disk unhealthy: node {}, bay {}, {}",
                 d.node_id, d.bay, d.disk_type
-            ));
-        }
-    }
-    if unhealthy_psus > 0 {
-        for p in &psu_details {
-            issues.push(format!(
-                "PSU issue: node {}, {} ({})",
-                p.node_id, p.location, p.state
             ));
         }
     }
@@ -516,13 +507,13 @@ fn collect_cluster(
             status: health_level,
             issues,
             disks_unhealthy: unhealthy_disks,
-            psus_unhealthy: unhealthy_psus,
+            psus_unhealthy: 0,
             data_at_risk,
             remaining_node_failures,
             remaining_drive_failures,
             protection_type,
             unhealthy_disk_details: disk_details,
-            unhealthy_psu_details: psu_details,
+            unhealthy_psu_details: vec![],
         },
     };
 
@@ -687,6 +678,7 @@ fn fetch_disk_health(client: &QumuloClient) -> (usize, Vec<UnhealthyDisk>) {
     }
 }
 
+#[allow(dead_code)] // Preserved for dedicated PSU commands (separate bead)
 /// Fetch PSU health from /v1/cluster/nodes/chassis/.
 /// Cloud clusters return empty psu_statuses arrays — handled gracefully.
 /// Returns (unhealthy_count, details).
@@ -1079,6 +1071,7 @@ fn parse_disk_health(slots: &Value) -> (usize, Vec<UnhealthyDisk>) {
     (count, unhealthy)
 }
 
+#[allow(dead_code)] // Preserved for dedicated PSU commands (separate bead)
 /// Parse PSU health from a chassis JSON array.
 fn parse_psu_health(chassis: &Value) -> (usize, Vec<UnhealthyPsu>) {
     let mut unhealthy = Vec::new();
