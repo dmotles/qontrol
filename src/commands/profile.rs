@@ -134,7 +134,7 @@ pub fn add_interactive(
     let expiration_str = expiration_time.map(|dt| dt.format("%Y-%m-%dT%H:%M:%SZ").to_string());
 
     // Create access token using the session token
-    let access_token = create_access_token(
+    let access_token = match create_access_token(
         &host,
         port,
         insecure,
@@ -142,7 +142,69 @@ pub fn add_interactive(
         &session_token,
         &auth_id,
         expiration_str.as_deref(),
-    )?;
+    ) {
+        Ok(token) => token,
+        Err(e) if e.to_string().contains("too_many_access_tokens") => {
+            println!();
+            println!("Too many access tokens. You must delete one before creating a new one.");
+            println!();
+
+            let tokens = list_access_tokens(&host, port, insecure, timeout, &session_token)?;
+
+            if tokens.is_empty() {
+                anyhow::bail!("No access tokens found to delete, but token limit was reached. Contact your administrator.");
+            }
+
+            // Build display items for selection
+            let mut items: Vec<String> = tokens
+                .iter()
+                .map(|t| {
+                    let id = t["id"].as_str().unwrap_or("unknown");
+                    let creator = t["creator"].as_str().unwrap_or("unknown");
+                    let expiration = t["expiration_time"].as_str().unwrap_or("never");
+                    format!("ID: {}  creator: {}  expires: {}", id, creator, expiration)
+                })
+                .collect();
+            items.push("Abort (do not delete any token)".to_string());
+
+            if non_interactive {
+                anyhow::bail!(
+                    "Too many access tokens and cannot prompt for deletion in non-interactive mode. \
+                     Delete a token manually and retry."
+                );
+            }
+
+            let selection = dialoguer::Select::new()
+                .with_prompt("Select a token to delete")
+                .items(&items)
+                .interact()?;
+
+            if selection == tokens.len() {
+                // Abort selected
+                anyhow::bail!("Aborted. Profile not added.");
+            }
+
+            let token_id = tokens[selection]["id"]
+                .as_str()
+                .ok_or_else(|| anyhow::anyhow!("selected token missing id"))?;
+
+            println!("Deleting token {}...", token_id);
+            delete_access_token(&host, port, insecure, timeout, &session_token, token_id)?;
+            println!("Token deleted. Creating new access token...");
+
+            // Retry
+            create_access_token(
+                &host,
+                port,
+                insecure,
+                timeout,
+                &session_token,
+                &auth_id,
+                expiration_str.as_deref(),
+            )?
+        }
+        Err(e) => return Err(e),
+    };
 
     // Fetch cluster UUID using the new access token
     let cluster_uuid = match QumuloClient::from_host(&host, port, insecure, timeout, &access_token)
@@ -261,11 +323,14 @@ fn create_access_token(
         match session_client.request("POST", "/v1/auth/access-tokens/", Some(&token_body)) {
             Ok(resp) => resp,
             Err(e) => {
-                if let Some(QontrolError::ApiError { status, .. }) =
+                if let Some(QontrolError::ApiError { status, body }) =
                     e.downcast_ref::<QontrolError>()
                 {
                     if *status == 403 {
                         anyhow::bail!("User does not have permission to create access tokens.");
+                    }
+                    if *status == 400 && body.contains("too_many_access_tokens_error") {
+                        anyhow::bail!("too_many_access_tokens");
                     }
                 }
                 return Err(e);
@@ -276,6 +341,37 @@ fn create_access_token(
         .as_str()
         .map(|s| s.to_string())
         .ok_or_else(|| anyhow::anyhow!("access token response missing bearer_token"))
+}
+
+/// List all access tokens for the current user.
+fn list_access_tokens(
+    host: &str,
+    port: u16,
+    insecure: bool,
+    timeout: u64,
+    session_token: &str,
+) -> Result<Vec<serde_json::Value>> {
+    let client = QumuloClient::from_host(host, port, insecure, timeout, session_token)?;
+    let resp = client.request("GET", "/v1/auth/access-tokens/", None)?;
+    let tokens = resp
+        .as_array()
+        .ok_or_else(|| anyhow::anyhow!("expected array of access tokens"))?
+        .clone();
+    Ok(tokens)
+}
+
+/// Delete an access token by ID.
+fn delete_access_token(
+    host: &str,
+    port: u16,
+    insecure: bool,
+    timeout: u64,
+    session_token: &str,
+    token_id: &str,
+) -> Result<()> {
+    let client = QumuloClient::from_host(host, port, insecure, timeout, session_token)?;
+    client.request("DELETE", &format!("/v1/auth/access-tokens/{}", token_id), None)?;
+    Ok(())
 }
 
 pub fn list() -> Result<()> {

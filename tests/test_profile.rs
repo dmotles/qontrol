@@ -306,6 +306,83 @@ async fn test_profile_add_login_expiry_6months() {
         .stdout(predicate::str::contains("expires"));
 }
 
+#[tokio::test]
+async fn test_profile_add_too_many_tokens_non_interactive() {
+    let ts = TestServer::start().await;
+    ts.mount_fixtures(&["session_login", "session_who_am_i"])
+        .await;
+
+    // Return 400 with too_many_access_tokens_error on POST to access-tokens
+    ts.mount_error_with_body(
+        "POST",
+        "/v1/auth/access-tokens/",
+        400,
+        r#"{"description": "too_many_access_tokens_error", "module": "api"}"#,
+    )
+    .await;
+
+    // Mount token list (needed for the error path)
+    ts.mount_fixture("access_token_list").await;
+
+    let port = ts.mock_server.address().port().to_string();
+    ts.command()
+        .args([
+            "profile",
+            "add",
+            "toomany",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            &port,
+            "--insecure",
+            "--username",
+            "admin",
+            "--password",
+            "testpass",
+        ])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("Too many access tokens"));
+}
+
+#[tokio::test]
+async fn test_profile_add_too_many_tokens_error_message() {
+    let ts = TestServer::start().await;
+    ts.mount_fixtures(&["session_login", "session_who_am_i"])
+        .await;
+
+    ts.mount_error_with_body(
+        "POST",
+        "/v1/auth/access-tokens/",
+        400,
+        r#"{"description": "too_many_access_tokens_error", "module": "api"}"#,
+    )
+    .await;
+
+    ts.mount_fixture("access_token_list").await;
+
+    let port = ts.mock_server.address().port().to_string();
+    ts.command()
+        .args([
+            "profile",
+            "add",
+            "toomany2",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            &port,
+            "--insecure",
+            "--username",
+            "admin",
+            "--password",
+            "testpass",
+        ])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("non-interactive mode"))
+        .stderr(predicate::str::contains("Delete a token manually"));
+}
+
 #[test]
 fn test_profile_add_login_requires_host() {
     let temp = tempfile::TempDir::new().unwrap();

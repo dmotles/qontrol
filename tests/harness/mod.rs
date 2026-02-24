@@ -19,7 +19,7 @@ use std::path::{Path, PathBuf};
 use assert_cmd::Command;
 use tempfile::TempDir;
 use wiremock::matchers::{method, path, query_param, query_param_is_missing};
-use wiremock::{Mock, MockServer, ResponseTemplate};
+use wiremock::{Mock, MockServer, ResponseTemplate, Times};
 
 /// Maps fixture name → (HTTP method, API path)
 const FIXTURE_ROUTES: &[(&str, &str, &str)] = &[
@@ -80,6 +80,7 @@ const FIXTURE_ROUTES: &[(&str, &str, &str)] = &[
     ("session_login", "POST", "/v1/session/login"),
     ("session_who_am_i", "GET", "/v1/session/who-am-i"),
     ("access_token_create", "POST", "/v1/auth/access-tokens/"),
+    ("access_token_list", "GET", "/v1/auth/access-tokens/"),
     // CDF endpoints
     ("portal_hubs", "GET", "/v2/portal/hubs/"),
     ("portal_spokes", "GET", "/v2/portal/spokes/"),
@@ -216,6 +217,53 @@ insecure = true
                 serde_json::json!({"description": "error", "module": "test"}).to_string(),
                 "application/json",
             ))
+            .mount(&self.mock_server)
+            .await;
+    }
+
+    /// Mount an error response with a custom body for a given API path.
+    pub async fn mount_error_with_body(
+        &self,
+        http_method: &str,
+        api_path: &str,
+        status_code: u16,
+        body: &str,
+    ) {
+        Mock::given(method(http_method))
+            .and(path(api_path))
+            .respond_with(
+                ResponseTemplate::new(status_code)
+                    .set_body_raw(body.to_string(), "application/json"),
+            )
+            .mount(&self.mock_server)
+            .await;
+    }
+
+    /// Mount an error response that only triggers a limited number of times.
+    pub async fn mount_error_with_body_times(
+        &self,
+        http_method: &str,
+        api_path: &str,
+        status_code: u16,
+        body: &str,
+        times: impl Into<Times>,
+    ) {
+        Mock::given(method(http_method))
+            .and(path(api_path))
+            .respond_with(
+                ResponseTemplate::new(status_code)
+                    .set_body_raw(body.to_string(), "application/json"),
+            )
+            .expect(times)
+            .mount(&self.mock_server)
+            .await;
+    }
+
+    /// Mount a successful empty response (e.g. for DELETE endpoints).
+    pub async fn mount_success_empty(&self, http_method: &str, api_path: &str) {
+        Mock::given(method(http_method))
+            .and(path(api_path))
+            .respond_with(ResponseTemplate::new(200).set_body_raw("", "application/json"))
             .mount(&self.mock_server)
             .await;
     }
