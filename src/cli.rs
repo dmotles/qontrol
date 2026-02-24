@@ -65,6 +65,11 @@ pub enum Commands {
         #[command(subcommand)]
         command: FleetCommands,
     },
+    /// Cross-cluster Data Fabric status
+    Cdf {
+        #[command(subcommand)]
+        command: CdfCommands,
+    },
     /// Hardware health checks
     Hw {
         #[command(subcommand)]
@@ -264,5 +269,22 @@ pub enum FsCommands {
     Stat {
         /// Path to inspect
         path: String,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum CdfCommands {
+    /// Show inter-cluster data fabric relationships
+    #[command(alias = "st")]
+    Status {
+        /// Show verbose per-relationship details
+        #[arg(long)]
+        detail: bool,
+        /// Filter to relationships involving a specific cluster
+        #[arg(long)]
+        cluster: Option<String>,
+        /// Filter to specific profiles (repeatable)
+        #[arg(long = "from", short = 'f', num_args = 1)]
+        profiles: Vec<String>,
     },
 }

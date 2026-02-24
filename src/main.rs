@@ -3,7 +3,7 @@ use clap::Parser;
 use tracing_subscriber::EnvFilter;
 
 use qontrol::cli::{
-    ApiCommands, Cli, ClusterCommands, Commands, FleetCommands, FleetHwCommands,
+    ApiCommands, CdfCommands, Cli, ClusterCommands, Commands, FleetCommands, FleetHwCommands,
     FleetHwPsuCommands, FsCommands, HwCommands, HwPsuCommands, ProfileCommands, SnapshotCommands,
 };
 use qontrol::client::QumuloClient;
@@ -171,6 +171,23 @@ fn run(cli: Cli) -> Result<()> {
                 },
             }
         }
+        Commands::Cdf { command } => match command {
+            CdfCommands::Status {
+                detail,
+                cluster,
+                profiles,
+            } => {
+                let config = load_config()?;
+                commands::cdf::run(
+                    &config,
+                    &profiles,
+                    cli.global_opts.json,
+                    detail,
+                    cluster.as_deref(),
+                    cli.global_opts.timeout,
+                )
+            }
+        },
         Commands::Fs { command } => {
             let config = load_config()?;
             let (_, profile) = resolve_profile(&config, &cli.profile)?;
