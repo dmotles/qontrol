@@ -506,6 +506,7 @@ fn format_edge_label(edge: &CdfEdge, detail: bool) -> String {
             target_path,
             mode,
             enabled,
+            ..
         } => {
             let short_mode = mode
                 .as_deref()
@@ -533,6 +534,7 @@ fn format_edge_label(edge: &CdfEdge, detail: bool) -> String {
             direction,
             bucket,
             folder,
+            ..
         } => {
             let dir = direction.as_deref().unwrap_or("?");
             let short_dir = match dir {
@@ -604,6 +606,11 @@ mod tests {
                 target_path: Some("/replica".into()),
                 mode: Some("REPLICATION_CONTINUOUS".into()),
                 enabled: true,
+                state: Some("ESTABLISHED".into()),
+                job_state: Some("REPLICATION_RUNNING".into()),
+                recovery_point: None,
+                error_from_last_job: None,
+                replication_job_status: None,
             },
         );
         graph.add_edge(
@@ -624,6 +631,7 @@ mod tests {
                 direction: Some("COPY_TO_OBJECT".into()),
                 bucket: Some("backup-bucket".into()),
                 folder: Some("daily/".into()),
+                state: Some("ACTIVE".into()),
             },
         );
         graph
@@ -708,6 +716,11 @@ mod tests {
                 target_path: Some("/dst".into()),
                 mode: Some("REPLICATION_SNAPSHOT".into()),
                 enabled: true,
+                state: None,
+                job_state: None,
+                recovery_point: None,
+                error_from_last_job: None,
+                replication_job_status: None,
             },
         );
         let output = render(&graph, false);
@@ -736,6 +749,11 @@ mod tests {
                 target_path: None,
                 mode: None,
                 enabled: false,
+                state: None,
+                job_state: None,
+                recovery_point: None,
+                error_from_last_job: None,
+                replication_job_status: None,
             },
         );
         let output = render(&graph, false);
@@ -762,6 +780,7 @@ mod tests {
                 direction: Some("COPY_TO_OBJECT".into()),
                 bucket: Some("my-bucket".into()),
                 folder: Some("backups/".into()),
+                state: None,
             },
         );
         let output = render(&graph, false);
@@ -804,6 +823,11 @@ mod tests {
                 target_path: None,
                 mode: None,
                 enabled: true,
+                state: None,
+                job_state: None,
+                recovery_point: None,
+                error_from_last_job: None,
+                replication_job_status: None,
             },
         );
         let output = render(&graph, false);
@@ -861,6 +885,11 @@ mod tests {
             target_path: Some("/b".into()),
             mode: Some("REPLICATION_CONTINUOUS".into()),
             enabled: true,
+            state: None,
+            job_state: None,
+            recovery_point: None,
+            error_from_last_job: None,
+            replication_job_status: None,
         };
         assert_eq!(format_edge_label(&repl, false), "replication (continuous)");
 
@@ -868,6 +897,7 @@ mod tests {
             direction: Some("COPY_TO_OBJECT".into()),
             bucket: Some("bkt".into()),
             folder: Some("f/".into()),
+            state: None,
         };
         assert_eq!(format_edge_label(&obj, false), "S3 copy-to");
     }
@@ -889,6 +919,7 @@ mod tests {
             direction: Some("COPY_FROM_OBJECT".into()),
             bucket: Some("my-bkt".into()),
             folder: Some("data/".into()),
+            state: None,
         };
         let label = format_edge_label(&obj, true);
         assert!(label.contains("copy-from"));
@@ -956,6 +987,11 @@ mod tests {
                 target_path: None,
                 mode: None,
                 enabled: true,
+                state: None,
+                job_state: None,
+                recovery_point: None,
+                error_from_last_job: None,
+                replication_job_status: None,
             },
         );
         let layout = compute_layout(&graph);

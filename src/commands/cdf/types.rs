@@ -282,11 +282,17 @@ pub enum CdfEdge {
         target_path: Option<String>,
         mode: Option<String>,
         enabled: bool,
+        state: Option<String>,
+        job_state: Option<String>,
+        recovery_point: Option<String>,
+        error_from_last_job: Option<String>,
+        replication_job_status: Option<ReplicationJobStatus>,
     },
     ObjectReplication {
         direction: Option<String>,
         bucket: Option<String>,
         folder: Option<String>,
+        state: Option<String>,
     },
 }
 
@@ -561,6 +567,11 @@ mod tests {
                 target_path: Some("/dst".into()),
                 mode: Some("REPLICATION_CONTINUOUS".into()),
                 enabled: true,
+                state: Some("ESTABLISHED".into()),
+                job_state: Some("REPLICATION_RUNNING".into()),
+                recovery_point: Some("2026-02-23T12:00:00Z".into()),
+                error_from_last_job: None,
+                replication_job_status: None,
             },
         );
         graph.add_edge(
@@ -570,6 +581,7 @@ mod tests {
                 direction: Some("COPY_TO_OBJECT".into()),
                 bucket: Some("backup".into()),
                 folder: Some("daily/".into()),
+                state: Some("ACTIVE".into()),
             },
         );
 

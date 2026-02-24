@@ -396,6 +396,11 @@ pub fn build_cdf_graph(clusters: &[ClusterCdfData], cluster_filter: Option<&str>
                             target_path: status.target_root_path.clone(),
                             mode: status.replication_mode.clone(),
                             enabled: status.replication_enabled,
+                            state: status.state.clone(),
+                            job_state: status.job_state.clone(),
+                            recovery_point: status.recovery_point.clone(),
+                            error_from_last_job: status.error_from_last_job.clone(),
+                            replication_job_status: status.replication_job_status.clone(),
                         },
                     );
                     replication_edges.insert(key, true);
@@ -429,6 +434,11 @@ pub fn build_cdf_graph(clusters: &[ClusterCdfData], cluster_filter: Option<&str>
                             target_path: status.target_root_path.clone(),
                             mode: None, // target side doesn't have mode
                             enabled: status.replication_enabled,
+                            state: status.state.clone(),
+                            job_state: status.job_state.clone(),
+                            recovery_point: status.recovery_point.clone(),
+                            error_from_last_job: status.error_from_last_job.clone(),
+                            replication_job_status: status.replication_job_status.clone(),
                         },
                     );
                     replication_edges.insert(key, true);
@@ -449,6 +459,12 @@ pub fn build_cdf_graph(clusters: &[ClusterCdfData], cluster_filter: Option<&str>
                     obj.region.as_deref(),
                 );
 
+                // Look up matching status by ID
+                let obj_status = cluster
+                    .object_relationship_statuses
+                    .iter()
+                    .find(|s| s.id == obj.id);
+
                 let direction = obj.direction.as_deref().unwrap_or("COPY_TO_OBJECT");
                 let (from, to) = if direction == "COPY_FROM_OBJECT" {
                     (s3_node, source_node)
@@ -463,6 +479,7 @@ pub fn build_cdf_graph(clusters: &[ClusterCdfData], cluster_filter: Option<&str>
                         direction: obj.direction.clone(),
                         bucket: obj.bucket.clone(),
                         folder: obj.object_folder.clone(),
+                        state: obj_status.and_then(|s| s.state.clone()),
                     },
                 );
             }
@@ -777,8 +794,11 @@ pub fn dump_graph_text(graph: &CdfGraph) -> String {
                 target_path,
                 mode,
                 enabled,
+                state,
+                job_state,
+                ..
             } => format!(
-                "  {} → {} [Replication: {}:{} → {}:{}, mode={}, enabled={}]",
+                "  {} → {} [Replication: {}:{} → {}:{}, mode={}, enabled={}, state={}, job_state={}]",
                 src_name,
                 tgt_name,
                 src_name,
@@ -786,19 +806,23 @@ pub fn dump_graph_text(graph: &CdfGraph) -> String {
                 tgt_name,
                 target_path.as_deref().unwrap_or("?"),
                 mode.as_deref().unwrap_or("?"),
-                enabled
+                enabled,
+                state.as_deref().unwrap_or("?"),
+                job_state.as_deref().unwrap_or("?"),
             ),
             CdfEdge::ObjectReplication {
                 direction,
                 bucket,
                 folder,
+                state,
             } => format!(
-                "  {} → {} [ObjectReplication: dir={}, bucket={}, folder={}]",
+                "  {} → {} [ObjectReplication: dir={}, bucket={}, folder={}, state={}]",
                 src_name,
                 tgt_name,
                 direction.as_deref().unwrap_or("?"),
                 bucket.as_deref().unwrap_or("?"),
-                folder.as_deref().unwrap_or("?")
+                folder.as_deref().unwrap_or("?"),
+                state.as_deref().unwrap_or("?"),
             ),
         };
         lines.push(desc);
@@ -886,19 +910,35 @@ pub fn graph_to_json(graph: &CdfGraph) -> serde_json::Value {
                     target_path,
                     mode,
                     enabled,
-                } => serde_json::json!({
-                    "source": src,
-                    "target": tgt,
-                    "type": "replication",
-                    "source_path": source_path,
-                    "target_path": target_path,
-                    "mode": mode,
-                    "enabled": enabled,
-                }),
+                    state,
+                    job_state,
+                    recovery_point,
+                    error_from_last_job,
+                    replication_job_status,
+                } => {
+                    let mut obj = serde_json::json!({
+                        "source": src,
+                        "target": tgt,
+                        "type": "replication",
+                        "source_path": source_path,
+                        "target_path": target_path,
+                        "mode": mode,
+                        "enabled": enabled,
+                        "state": state,
+                        "job_state": job_state,
+                        "recovery_point": recovery_point,
+                        "error_from_last_job": error_from_last_job,
+                    });
+                    if let Some(job) = replication_job_status {
+                        obj["replication_job_status"] = serde_json::to_value(job).unwrap_or_default();
+                    }
+                    obj
+                },
                 CdfEdge::ObjectReplication {
                     direction,
                     bucket,
                     folder,
+                    state,
                 } => serde_json::json!({
                     "source": src,
                     "target": tgt,
@@ -906,6 +946,7 @@ pub fn graph_to_json(graph: &CdfGraph) -> serde_json::Value {
                     "direction": direction,
                     "bucket": bucket,
                     "folder": folder,
+                    "state": state,
                 }),
             }
         })
