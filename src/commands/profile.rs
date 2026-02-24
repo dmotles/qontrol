@@ -161,8 +161,9 @@ pub fn add_interactive(
                 .map(|t| {
                     let id = t["id"].as_str().unwrap_or("unknown");
                     let creator = t["creator"]["name"].as_str().unwrap_or("unknown");
+                    let created = t["creation_time"].as_str().unwrap_or("unknown");
                     let expiration = t["expiration_time"].as_str().unwrap_or("never");
-                    format!("ID: {}  creator: {}  expires: {}", id, creator, expiration)
+                    format!("ID: {}  creator: {}  created: {}  expires: {}", id, creator, created, expiration)
                 })
                 .collect();
             items.push("Abort (do not delete any token)".to_string());
