@@ -1,4 +1,5 @@
 pub mod collector;
+pub mod renderer;
 pub mod types;
 
 use anyhow::Result;
@@ -27,14 +28,8 @@ pub fn run(
         let json = collector::graph_to_json(&result.graph);
         println!("{}", serde_json::to_string_pretty(&json)?);
     } else {
-        let output = collector::dump_graph_text(&result.graph);
-        println!("{}", output);
-
-        if detail {
-            // In detail mode, also print per-edge status information
-            println!();
-            println!("(Detail mode: full per-relationship info will be available in Phase 3 renderer)");
-        }
+        let output = renderer::render(&result.graph, detail);
+        print!("{}", output);
     }
 
     Ok(())
