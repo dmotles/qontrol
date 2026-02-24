@@ -1,0 +1,15 @@
+[
+  {
+    "id": 10,
+    "target_address": "10.220.1.10",
+    "target_port": 3712,
+    "source_root_id": "2",
+    "source_root_read_only": false,
+    "map_local_ids_to_nfs_ids": false,
+    "replication_enabled": true,
+    "replication_mode": "REPLICATION_CONTINUOUS",
+    "blackout_window_timezone": "America/Los_Angeles",
+    "blackout_windows": [],
+    "snapshot_policies": []
+  }
+]

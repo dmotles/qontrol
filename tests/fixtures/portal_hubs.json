@@ -1,0 +1,26 @@
+{
+  "entries": [
+    {
+      "id": 1,
+      "type": "PORTAL_READ_WRITE",
+      "state": "ACCEPTED",
+      "status": "ACTIVE",
+      "spoke_hosts": [{"address": "10.220.1.10", "port": 3712}],
+      "spoke_cluster_uuid": "aaaaaaaa-1111-2222-3333-444444444444",
+      "spoke_cluster_name": "spoke-cluster-1",
+      "pending_roots": [],
+      "authorized_roots": ["/shared/data"]
+    },
+    {
+      "id": 2,
+      "type": "PORTAL_READ_ONLY",
+      "state": "PENDING",
+      "status": "INACTIVE",
+      "spoke_hosts": [],
+      "spoke_cluster_uuid": null,
+      "spoke_cluster_name": null,
+      "pending_roots": ["/incoming"],
+      "authorized_roots": []
+    }
+  ]
+}

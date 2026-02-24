@@ -1,0 +1,16 @@
+{
+  "entries": [
+    {
+      "id": 5,
+      "type": "PORTAL_READ_WRITE",
+      "state": "ACCEPTED",
+      "status": "ACTIVE",
+      "hub_hosts": [{"address": "10.220.0.10", "port": 3712}],
+      "hub_id": 1,
+      "hub_cluster_uuid": "bbbbbbbb-1111-2222-3333-444444444444",
+      "roots": [
+        {"local_root": "/local/data", "remote_root": "/shared/data", "authorized": true}
+      ]
+    }
+  ]
+}

@@ -1,4 +1,5 @@
 pub mod api;
+pub mod cdf;
 pub mod cluster;
 pub mod fs;
 pub mod hw;

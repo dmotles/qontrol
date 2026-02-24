@@ -1,21 +1,14 @@
-mod cache;
-mod cli;
-mod client;
-mod commands;
-mod config;
-mod error;
-mod output;
-
 use anyhow::Result;
 use clap::Parser;
 use tracing_subscriber::EnvFilter;
 
-use cli::{
+use qontrol::cli::{
     ApiCommands, Cli, ClusterCommands, Commands, FleetCommands, FleetHwCommands,
     FleetHwPsuCommands, FsCommands, HwCommands, HwPsuCommands, ProfileCommands, SnapshotCommands,
 };
-use client::QumuloClient;
-use config::{ensure_cluster_uuids, load_config, resolve_profile};
+use qontrol::client::QumuloClient;
+use qontrol::commands;
+use qontrol::config::{ensure_cluster_uuids, load_config, resolve_profile};
 
 fn main() {
     let cli = Cli::parse();

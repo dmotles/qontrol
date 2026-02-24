@@ -1,0 +1,12 @@
+[
+  {
+    "id": 30,
+    "direction": "COPY_TO_OBJECT",
+    "state": "ESTABLISHED",
+    "object_store_address": "s3.us-west-2.amazonaws.com",
+    "bucket": "qumulo-backup-prod",
+    "region": "us-west-2",
+    "object_folder": "daily-backups/",
+    "local_directory_id": "100"
+  }
+]

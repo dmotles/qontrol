@@ -1,0 +1,28 @@
+[
+  {
+    "id": 30,
+    "direction": "COPY_TO_OBJECT",
+    "local_directory_id": "100",
+    "object_store_address": "s3.us-west-2.amazonaws.com",
+    "port": 443,
+    "ca_certificate": "",
+    "bucket": "qumulo-backup-prod",
+    "bucket_style": "BUCKET_STYLE_VIRTUAL_HOSTED",
+    "object_folder": "daily-backups/",
+    "region": "us-west-2",
+    "access_key_id": "AKIAIOSFODNN7EXAMPLE"
+  },
+  {
+    "id": 31,
+    "direction": "COPY_FROM_OBJECT",
+    "local_directory_id": "200",
+    "object_store_address": "s3.us-east-1.amazonaws.com",
+    "port": 443,
+    "ca_certificate": "",
+    "bucket": "qumulo-restore",
+    "bucket_style": "BUCKET_STYLE_PATH",
+    "object_folder": "",
+    "region": "us-east-1",
+    "access_key_id": "AKIAI44QH8DHBEXAMPLE"
+  }
+]

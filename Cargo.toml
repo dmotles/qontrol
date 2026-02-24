@@ -5,6 +5,10 @@ edition = "2021"
 description = "Qumulo Data Fabric CLI"
 license = "MIT"
 
+[lib]
+name = "qontrol"
+path = "src/lib.rs"
+
 [[bin]]
 name = "qontrol"
 path = "src/main.rs"
@@ -17,6 +21,7 @@ clap = { version = "4.5", features = ["derive", "env"] }
 console = "0.15"
 directories = "6.0"
 indicatif = "0.17"
+petgraph = "0.6"
 reqwest = { version = "0.12", features = ["blocking", "json", "native-tls-vendored"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"

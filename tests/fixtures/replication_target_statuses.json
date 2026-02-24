@@ -1,0 +1,27 @@
+[
+  {
+    "id": 20,
+    "state": "ESTABLISHED",
+    "end_reason": null,
+    "source_cluster_name": "hub-cluster",
+    "source_cluster_uuid": "bbbbbbbb-1111-2222-3333-444444444444",
+    "source_root_path": "/data",
+    "source_address": "10.220.0.10",
+    "source_port": 3712,
+    "source_root_read_only": false,
+    "target_cluster_name": "spoke-cluster-1",
+    "target_cluster_uuid": "aaaaaaaa-1111-2222-3333-444444444444",
+    "target_root_path": "/replicated/data",
+    "target_root_read_only": true,
+    "replication_enabled": true,
+    "job_state": "REPLICATION_NOT_RUNNING",
+    "job_start_time": null,
+    "recovery_point": "2026-02-23T11:30:00Z",
+    "error_from_last_job": null,
+    "duration_of_last_job": {"nanoseconds": "45000000000"},
+    "target_root_id": "5",
+    "replication_job_status": null,
+    "recovery_point_snapshot": null,
+    "lock_key": null
+  }
+]

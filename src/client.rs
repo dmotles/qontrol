@@ -277,6 +277,36 @@ impl QumuloClient {
         )
     }
 
+    // CDF (Cross-cluster Data Fabric) endpoints
+
+    pub fn get_portal_hubs(&self) -> Result<Value> {
+        self.cached_get("/v2/portal/hubs/", TTL_MODERATE)
+    }
+
+    pub fn get_portal_spokes(&self) -> Result<Value> {
+        self.cached_get("/v2/portal/spokes/", TTL_MODERATE)
+    }
+
+    pub fn get_replication_sources(&self) -> Result<Value> {
+        self.cached_get("/v2/replication/source-relationships/", TTL_MODERATE)
+    }
+
+    pub fn get_replication_source_statuses(&self) -> Result<Value> {
+        self.request("GET", "/v2/replication/source-relationships/status/", None)
+    }
+
+    pub fn get_replication_target_statuses(&self) -> Result<Value> {
+        self.request("GET", "/v2/replication/target-relationships/status/", None)
+    }
+
+    pub fn get_object_relationships(&self) -> Result<Value> {
+        self.cached_get("/v3/replication/object-relationships/", TTL_MODERATE)
+    }
+
+    pub fn get_object_relationship_statuses(&self) -> Result<Value> {
+        self.request("GET", "/v3/replication/object-relationships/status/", None)
+    }
+
     // Convenience methods for filesystem commands
 
     /// List directory entries at a given path (by ref like inode ID or path)

@@ -80,6 +80,34 @@ const FIXTURE_ROUTES: &[(&str, &str, &str)] = &[
     ("session_login", "POST", "/v1/session/login"),
     ("session_who_am_i", "GET", "/v1/session/who-am-i"),
     ("access_token_create", "POST", "/v1/auth/access-tokens/"),
+    // CDF endpoints
+    ("portal_hubs", "GET", "/v2/portal/hubs/"),
+    ("portal_spokes", "GET", "/v2/portal/spokes/"),
+    (
+        "replication_sources",
+        "GET",
+        "/v2/replication/source-relationships/",
+    ),
+    (
+        "replication_source_statuses",
+        "GET",
+        "/v2/replication/source-relationships/status/",
+    ),
+    (
+        "replication_target_statuses",
+        "GET",
+        "/v2/replication/target-relationships/status/",
+    ),
+    (
+        "object_relationships",
+        "GET",
+        "/v3/replication/object-relationships/",
+    ),
+    (
+        "object_relationship_statuses",
+        "GET",
+        "/v3/replication/object-relationships/status/",
+    ),
 ];
 
 pub struct TestServer {
