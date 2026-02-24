@@ -296,6 +296,34 @@ pub enum CdfEdge {
     },
 }
 
+impl CdfEdge {
+    /// Returns true if this edge represents a problematic relationship:
+    /// disabled, errored, or in an unhealthy state.
+    pub fn is_problem(&self) -> bool {
+        match self {
+            CdfEdge::Portal { state, status, .. } => {
+                // Healthy portals are ACCEPTED + ACTIVE
+                state != "ACCEPTED" || status != "ACTIVE"
+            }
+            CdfEdge::Replication {
+                enabled,
+                error_from_last_job,
+                state,
+                ..
+            } => {
+                !enabled
+                    || error_from_last_job.is_some()
+                    || state
+                        .as_deref()
+                        .map_or(true, |s| s != "ESTABLISHED")
+            }
+            CdfEdge::ObjectReplication { state, .. } => {
+                state.as_deref().map_or(true, |s| s != "ACTIVE")
+            }
+        }
+    }
+}
+
 /// Directed graph of inter-cluster data fabric relationships.
 pub type CdfGraph = DiGraph<CdfNode, CdfEdge>;
 

@@ -177,6 +177,7 @@ fn run(cli: Cli) -> Result<()> {
                 graph,
                 cluster,
                 profiles,
+                problems_only,
             } => {
                 let config = load_config()?;
                 commands::cdf::run(
@@ -186,6 +187,7 @@ fn run(cli: Cli) -> Result<()> {
                     detail,
                     graph,
                     cluster.as_deref(),
+                    problems_only,
                     cli.global_opts.timeout,
                 )
             }

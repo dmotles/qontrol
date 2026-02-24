@@ -289,5 +289,8 @@ pub enum CdfCommands {
         /// Filter to specific profiles (repeatable)
         #[arg(long = "from", short = 'f', num_args = 1)]
         profiles: Vec<String>,
+        /// Only show relationships with problems (disabled, errored, or unhealthy)
+        #[arg(long)]
+        problems_only: bool,
     },
 }
