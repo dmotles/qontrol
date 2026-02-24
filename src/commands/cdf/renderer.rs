@@ -454,7 +454,7 @@ fn render_layer_edges(
     };
 
     // Render each edge as a labeled connection line
-    for (src_idx, _tgt_idx, edge) in &edges_to_render {
+    for (src_idx, tgt_idx, edge) in &edges_to_render {
         let src_center = node_centers
             .iter()
             .find(|(idx, _)| idx == src_idx)
@@ -462,7 +462,9 @@ fn render_layer_edges(
             .unwrap_or(2);
 
         let edge_label = format_edge_label(edge, detail);
-        let styled_label = style_edge_label(edge, &edge_label);
+        let target_name = node_label(&graph[*tgt_idx]);
+        let full_label = format!("{} → {}", edge_label, target_name);
+        let styled_label = style_edge_label(edge, &full_label);
 
         // Draw: vertical connector from source, then arrow and label
         let connector = " ".repeat(src_center) + "│";
@@ -662,10 +664,10 @@ mod tests {
         assert!(output.contains("iss"));
         assert!(output.contains("backup-bucket"));
 
-        // Verify edge labels appear (compact)
-        assert!(output.contains("replication (continuous)"));
-        assert!(output.contains("portal (read write)"));
-        assert!(output.contains("S3 copy-to"));
+        // Verify edge labels include target node name
+        assert!(output.contains("replication (continuous) → iss"));
+        assert!(output.contains("portal (read write) → iss"));
+        assert!(output.contains("S3 copy-to → S3: backup-bucket"));
 
         // Should NOT contain detail info in compact mode
         assert!(!output.contains("/data"));
@@ -677,9 +679,10 @@ mod tests {
         let graph = make_test_graph();
         let output = render(&graph, true);
 
-        // Detail mode should include paths and states
+        // Detail mode should include paths, states, and target names
         assert!(output.contains("replication (continuous)"));
         assert!(output.contains("portal (read write)"));
+        assert!(output.contains("→ iss"));
         // Detail edge info
         assert!(output.contains("state=ACCEPTED"));
         assert!(output.contains("status=ACTIVE"));
@@ -709,7 +712,7 @@ mod tests {
         );
         let output = render(&graph, false);
         assert!(output.contains("10.0.0.99 (unknown)"));
-        assert!(output.contains("replication (snapshot)"));
+        assert!(output.contains("replication (snapshot) → 10.0.0.99 (unknown)"));
     }
 
     #[test]
@@ -764,7 +767,7 @@ mod tests {
         let output = render(&graph, false);
         assert!(output.contains("cluster-a"));
         assert!(output.contains("my-bucket"));
-        assert!(output.contains("S3 copy-to"));
+        assert!(output.contains("S3 copy-to → S3: my-bucket"));
     }
 
     #[test]
@@ -891,6 +894,38 @@ mod tests {
         assert!(label.contains("copy-from"));
         assert!(label.contains("bucket=my-bkt"));
         assert!(label.contains("folder=data/"));
+    }
+
+    #[test]
+    fn test_edges_show_target_node_name() {
+        let mut graph = CdfGraph::new();
+        let n1 = graph.add_node(CdfNode::ProfiledCluster {
+            name: "source".into(),
+            uuid: "uuid-1".into(),
+            address: "10.0.0.1".into(),
+        });
+        let n2 = graph.add_node(CdfNode::ProfiledCluster {
+            name: "target".into(),
+            uuid: "uuid-2".into(),
+            address: "10.0.0.2".into(),
+        });
+        graph.add_edge(
+            n1,
+            n2,
+            CdfEdge::Replication {
+                source_path: None,
+                target_path: None,
+                mode: Some("REPLICATION_CONTINUOUS".into()),
+                enabled: true,
+            },
+        );
+        let output = render(&graph, false);
+        // Edge label must include " → target" to show which node it connects to
+        assert!(
+            output.contains("replication (continuous) → target"),
+            "Edge label should include target node name, got:\n{}",
+            output
+        );
     }
 
     #[test]
