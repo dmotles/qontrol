@@ -1,5 +1,6 @@
 pub mod collector;
 pub mod renderer;
+pub mod renderer_table;
 pub mod types;
 
 use anyhow::Result;
@@ -12,6 +13,7 @@ pub fn run(
     profiles: &[String],
     json_mode: bool,
     detail: bool,
+    graph_mode: bool,
     cluster_filter: Option<&str>,
     timeout_secs: u64,
 ) -> Result<()> {
@@ -27,8 +29,11 @@ pub fn run(
     if json_mode {
         let json = collector::graph_to_json(&result.graph);
         println!("{}", serde_json::to_string_pretty(&json)?);
-    } else {
+    } else if graph_mode {
         let output = renderer::render(&result.graph, detail);
+        print!("{}", output);
+    } else {
+        let output = renderer_table::render_table(&result.graph, detail);
         print!("{}", output);
     }
 

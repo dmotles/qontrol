@@ -280,6 +280,9 @@ pub enum CdfCommands {
         /// Show verbose per-relationship details
         #[arg(long)]
         detail: bool,
+        /// Show ASCII topology graph instead of table
+        #[arg(long)]
+        graph: bool,
         /// Filter to relationships involving a specific cluster
         #[arg(long)]
         cluster: Option<String>,

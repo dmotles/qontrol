@@ -948,6 +948,11 @@ mod tests {
                 target_path: None,
                 mode: Some("REPLICATION_CONTINUOUS".into()),
                 enabled: true,
+                state: None,
+                job_state: None,
+                recovery_point: None,
+                error_from_last_job: None,
+                replication_job_status: None,
             },
         );
         let output = render(&graph, false);
