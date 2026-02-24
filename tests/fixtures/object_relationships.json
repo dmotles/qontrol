@@ -1,6 +1,6 @@
 [
   {
-    "id": 30,
+    "id": "173f0649-10da-422e-8725-712eaeee5334",
     "direction": "COPY_TO_OBJECT",
     "local_directory_id": "100",
     "object_store_address": "s3.us-west-2.amazonaws.com",
@@ -13,7 +13,7 @@
     "access_key_id": "AKIAIOSFODNN7EXAMPLE"
   },
   {
-    "id": 31,
+    "id": "6c6cc96c-e764-456f-adf2-e96de2ddd097",
     "direction": "COPY_FROM_OBJECT",
     "local_directory_id": "200",
     "object_store_address": "s3.us-east-1.amazonaws.com",

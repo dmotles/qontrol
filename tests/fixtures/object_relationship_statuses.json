@@ -1,6 +1,6 @@
 [
   {
-    "id": 30,
+    "id": "173f0649-10da-422e-8725-712eaeee5334",
     "direction": "COPY_TO_OBJECT",
     "state": "ESTABLISHED",
     "object_store_address": "s3.us-west-2.amazonaws.com",

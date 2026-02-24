@@ -68,7 +68,7 @@ pub struct PortalSpoke {
 /// A source replication relationship.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ReplicationSource {
-    pub id: u64,
+    pub id: String,
     #[serde(default)]
     pub target_address: Option<String>,
     #[serde(default)]
@@ -128,7 +128,7 @@ pub struct ReplicationJobStatus {
 /// Status for a source replication relationship.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ReplicationSourceStatus {
-    pub id: u64,
+    pub id: String,
     #[serde(default)]
     pub state: Option<String>,
     #[serde(default)]
@@ -164,7 +164,7 @@ pub struct ReplicationSourceStatus {
 /// Status for a target replication relationship.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ReplicationTargetStatus {
-    pub id: u64,
+    pub id: String,
     #[serde(default)]
     pub state: Option<String>,
     #[serde(default)]
@@ -202,7 +202,7 @@ pub struct ReplicationTargetStatus {
 /// An object replication relationship (S3).
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ObjectRelationship {
-    pub id: u64,
+    pub id: String,
     #[serde(default)]
     pub direction: Option<String>,
     #[serde(default)]
@@ -226,7 +226,7 @@ pub struct ObjectRelationship {
 /// Status for an object replication relationship.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ObjectRelationshipStatus {
-    pub id: u64,
+    pub id: String,
     #[serde(default)]
     pub direction: Option<String>,
     #[serde(default)]
@@ -371,7 +371,7 @@ mod tests {
     #[test]
     fn test_replication_source_deserialize() {
         let data = json!([{
-            "id": 10,
+            "id": "075d8b86-8e28-40f2-921d-8a1b6585475a",
             "target_address": "10.0.1.1",
             "target_port": 3712,
             "source_root_id": "2",
@@ -380,7 +380,7 @@ mod tests {
         }]);
         let sources: Vec<ReplicationSource> = serde_json::from_value(data).unwrap();
         assert_eq!(sources.len(), 1);
-        assert_eq!(sources[0].id, 10);
+        assert_eq!(sources[0].id, "075d8b86-8e28-40f2-921d-8a1b6585475a");
         assert!(sources[0].replication_enabled);
         assert_eq!(sources[0].replication_mode.as_deref(), Some("REPLICATION_CONTINUOUS"));
     }
@@ -395,7 +395,7 @@ mod tests {
     #[test]
     fn test_replication_source_status_deserialize() {
         let data = json!([{
-            "id": 10,
+            "id": "075d8b86-8e28-40f2-921d-8a1b6585475a",
             "state": "ESTABLISHED",
             "source_cluster_name": "cluster-a",
             "source_cluster_uuid": "uuid-a",
@@ -425,7 +425,7 @@ mod tests {
     #[test]
     fn test_replication_target_status_deserialize() {
         let data = json!([{
-            "id": 20,
+            "id": "1255815d-9cf1-4887-9388-d4d2653b8475",
             "state": "ESTABLISHED",
             "source_cluster_name": "cluster-a",
             "source_address": "10.0.0.1",
@@ -435,7 +435,7 @@ mod tests {
             "job_state": "REPLICATION_NOT_RUNNING"
         }]);
         let statuses: Vec<ReplicationTargetStatus> = serde_json::from_value(data).unwrap();
-        assert_eq!(statuses[0].id, 20);
+        assert_eq!(statuses[0].id, "1255815d-9cf1-4887-9388-d4d2653b8475");
         assert_eq!(statuses[0].source_address.as_deref(), Some("10.0.0.1"));
         assert_eq!(statuses[0].source_port, Some(3712));
     }
@@ -443,7 +443,7 @@ mod tests {
     #[test]
     fn test_object_relationship_deserialize() {
         let data = json!([{
-            "id": 30,
+            "id": "173f0649-10da-422e-8725-712eaeee5334",
             "direction": "COPY_TO_OBJECT",
             "local_directory_id": "100",
             "object_store_address": "s3.amazonaws.com",
@@ -463,7 +463,7 @@ mod tests {
     #[test]
     fn test_object_relationship_status_deserialize() {
         let data = json!([{
-            "id": 30,
+            "id": "173f0649-10da-422e-8725-712eaeee5334",
             "direction": "COPY_TO_OBJECT",
             "state": "ACTIVE",
             "object_store_address": "s3.amazonaws.com",
@@ -477,7 +477,7 @@ mod tests {
     #[test]
     fn test_object_relationship_missing_optional() {
         let data = json!([{
-            "id": 31,
+            "id": "6c6cc96c-e764-456f-adf2-e96de2ddd097",
             "direction": "COPY_FROM_OBJECT"
         }]);
         let rels: Vec<ObjectRelationship> = serde_json::from_value(data).unwrap();

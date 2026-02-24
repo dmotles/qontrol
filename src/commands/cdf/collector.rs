@@ -969,7 +969,7 @@ mod tests {
         cluster_a
             .replication_source_statuses
             .push(ReplicationSourceStatus {
-                id: 1,
+                id: "rel-001".into(),
                 state: Some("ESTABLISHED".into()),
                 source_cluster_name: Some("cluster-a".into()),
                 source_cluster_uuid: Some("uuid-a".into()),
@@ -991,7 +991,7 @@ mod tests {
         cluster_b
             .replication_target_statuses
             .push(ReplicationTargetStatus {
-                id: 1,
+                id: "rel-001".into(),
                 state: Some("ESTABLISHED".into()),
                 source_cluster_name: Some("cluster-a".into()),
                 source_cluster_uuid: Some("uuid-a".into()),
@@ -1022,7 +1022,7 @@ mod tests {
         cluster_a
             .replication_source_statuses
             .push(ReplicationSourceStatus {
-                id: 1,
+                id: "rel-unknown".into(),
                 state: Some("ESTABLISHED".into()),
                 source_cluster_name: Some("cluster-a".into()),
                 source_cluster_uuid: Some("uuid-a".into()),
@@ -1055,7 +1055,7 @@ mod tests {
     fn test_s3_bucket_node_creation() {
         let mut cluster_a = make_cluster("a", "cluster-a", "uuid-a", "10.0.0.1");
         cluster_a.object_relationships.push(ObjectRelationship {
-            id: 30,
+            id: "obj-030".into(),
             direction: Some("COPY_TO_OBJECT".into()),
             local_directory_id: Some("100".into()),
             object_store_address: Some("s3.amazonaws.com".into()),
@@ -1126,7 +1126,7 @@ mod tests {
     fn test_graph_json_serialization() {
         let mut cluster_a = make_cluster("a", "cluster-a", "uuid-a", "10.0.0.1");
         cluster_a.object_relationships.push(ObjectRelationship {
-            id: 1,
+            id: "obj-001".into(),
             direction: Some("COPY_TO_OBJECT".into()),
             local_directory_id: None,
             object_store_address: Some("s3.amazonaws.com".into()),
@@ -1156,7 +1156,7 @@ mod tests {
         cluster_a
             .replication_source_statuses
             .push(ReplicationSourceStatus {
-                id: 1,
+                id: "rel-001".into(),
                 state: Some("ESTABLISHED".into()),
                 source_cluster_name: Some("cluster-a".into()),
                 source_cluster_uuid: Some("uuid-a".into()),
@@ -1197,7 +1197,7 @@ mod tests {
     fn test_multiple_s3_buckets_same_address() {
         let mut cluster_a = make_cluster("a", "cluster-a", "uuid-a", "10.0.0.1");
         cluster_a.object_relationships.push(ObjectRelationship {
-            id: 1,
+            id: "obj-001".into(),
             direction: Some("COPY_TO_OBJECT".into()),
             local_directory_id: None,
             object_store_address: Some("s3.amazonaws.com".into()),
@@ -1209,7 +1209,7 @@ mod tests {
             access_key_id: None,
         });
         cluster_a.object_relationships.push(ObjectRelationship {
-            id: 2,
+            id: "obj-002".into(),
             direction: Some("COPY_TO_OBJECT".into()),
             local_directory_id: None,
             object_store_address: Some("s3.amazonaws.com".into()),
@@ -1231,7 +1231,7 @@ mod tests {
     fn test_copy_from_object_direction() {
         let mut cluster_a = make_cluster("a", "cluster-a", "uuid-a", "10.0.0.1");
         cluster_a.object_relationships.push(ObjectRelationship {
-            id: 1,
+            id: "obj-001".into(),
             direction: Some("COPY_FROM_OBJECT".into()),
             local_directory_id: None,
             object_store_address: Some("s3.amazonaws.com".into()),

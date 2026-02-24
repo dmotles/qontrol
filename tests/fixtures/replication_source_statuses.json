@@ -1,6 +1,6 @@
 [
   {
-    "id": 10,
+    "id": "075d8b86-8e28-40f2-921d-8a1b6585475a",
     "state": "ESTABLISHED",
     "end_reason": null,
     "source_cluster_name": "hub-cluster",

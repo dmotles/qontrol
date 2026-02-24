@@ -66,7 +66,7 @@ async fn test_replication_sources_fixture_deserializes() {
         .unwrap();
     let body: Vec<ReplicationSource> = resp.json().await.unwrap();
     assert_eq!(body.len(), 1);
-    assert_eq!(body[0].id, 10);
+    assert_eq!(body[0].id, "075d8b86-8e28-40f2-921d-8a1b6585475a");
     assert!(body[0].replication_enabled);
     assert_eq!(
         body[0].replication_mode.as_deref(),
@@ -116,7 +116,7 @@ async fn test_replication_target_statuses_fixture_deserializes() {
         .unwrap();
     let body: Vec<ReplicationTargetStatus> = resp.json().await.unwrap();
     assert_eq!(body.len(), 1);
-    assert_eq!(body[0].id, 20);
+    assert_eq!(body[0].id, "1255815d-9cf1-4887-9388-d4d2653b8475");
     assert_eq!(body[0].state.as_deref(), Some("ESTABLISHED"));
     assert_eq!(body[0].source_address.as_deref(), Some("10.220.0.10"));
 }
