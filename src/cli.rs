@@ -283,6 +283,9 @@ pub enum CdfCommands {
         /// Show ASCII topology graph instead of table
         #[arg(long)]
         graph: bool,
+        /// Show ASCII DAG topology (experimental, uses ascii-dag crate)
+        #[arg(long)]
+        ascii_dag: bool,
         /// Filter to relationships involving a specific cluster
         #[arg(long)]
         cluster: Option<String>,

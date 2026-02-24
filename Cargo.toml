@@ -34,6 +34,7 @@ rpassword = "7"
 urlencoding = "2.1"
 ctrlc = "3.4"
 rust-sugiyama = "0.4.0"
+ascii-dag = "0.8"
 
 [dev-dependencies]
 assert_cmd = "2.0"

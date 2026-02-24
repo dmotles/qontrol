@@ -77,6 +77,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5f0e0fee31ef5ed1ba1316088939cea399010ed7731dba877ed44aeb407a75ea"
 
 [[package]]
+name = "ascii-dag"
+version = "0.8.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7677644e7993a1957d106e5d68650403302e22bb5c6ad6d00e69ee8936b1ddda"
+
+[[package]]
 name = "assert-json-diff"
 version = "2.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1659,6 +1665,7 @@ name = "qontrol"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "ascii-dag",
  "assert_cmd",
  "cacache",
  "chrono",
