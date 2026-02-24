@@ -1,6 +1,5 @@
 pub mod collector;
 pub mod renderer;
-pub mod renderer_ascii_dag;
 pub mod renderer_table;
 pub mod types;
 
@@ -58,7 +57,6 @@ pub fn run(
     json_mode: bool,
     detail: bool,
     graph_mode: bool,
-    ascii_dag_mode: bool,
     cluster_filter: Option<&str>,
     problems_only: bool,
     timeout_secs: u64,
@@ -86,9 +84,6 @@ pub fn run(
     if json_mode {
         let json = collector::graph_to_json(&graph);
         println!("{}", serde_json::to_string_pretty(&json)?);
-    } else if ascii_dag_mode {
-        let output = renderer_ascii_dag::render(&graph, detail);
-        print!("{}", output);
     } else if graph_mode {
         let output = renderer::render(&graph, detail);
         print!("{}", output);

@@ -175,7 +175,6 @@ fn run(cli: Cli) -> Result<()> {
             CdfCommands::Status {
                 detail,
                 graph,
-                ascii_dag,
                 cluster,
                 profiles,
                 problems_only,
@@ -187,7 +186,6 @@ fn run(cli: Cli) -> Result<()> {
                     cli.global_opts.json,
                     detail,
                     graph,
-                    ascii_dag,
                     cluster.as_deref(),
                     problems_only,
                     cli.global_opts.timeout,
