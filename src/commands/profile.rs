@@ -149,7 +149,7 @@ pub fn add_interactive(
             println!("Too many access tokens. You must delete one before creating a new one.");
             println!();
 
-            let tokens = list_access_tokens(&host, port, insecure, timeout, &session_token)?;
+            let tokens = list_access_tokens(&host, port, insecure, timeout, &session_token, &auth_id)?;
 
             if tokens.is_empty() {
                 anyhow::bail!("No access tokens found to delete, but token limit was reached. Contact your administrator.");
@@ -160,7 +160,7 @@ pub fn add_interactive(
                 .iter()
                 .map(|t| {
                     let id = t["id"].as_str().unwrap_or("unknown");
-                    let creator = t["creator"].as_str().unwrap_or("unknown");
+                    let creator = t["creator"]["name"].as_str().unwrap_or("unknown");
                     let expiration = t["expiration_time"].as_str().unwrap_or("never");
                     format!("ID: {}  creator: {}  expires: {}", id, creator, expiration)
                 })
@@ -343,19 +343,21 @@ fn create_access_token(
         .ok_or_else(|| anyhow::anyhow!("access token response missing bearer_token"))
 }
 
-/// List all access tokens for the current user.
+/// List access tokens for the given user (by auth_id).
 fn list_access_tokens(
     host: &str,
     port: u16,
     insecure: bool,
     timeout: u64,
     session_token: &str,
+    auth_id: &str,
 ) -> Result<Vec<serde_json::Value>> {
     let client = QumuloClient::from_host(host, port, insecure, timeout, session_token)?;
-    let resp = client.request("GET", "/v1/auth/access-tokens/", None)?;
-    let tokens = resp
+    let path = format!("/v1/auth/access-tokens/?user=auth_id:{}", auth_id);
+    let resp = client.request("GET", &path, None)?;
+    let tokens = resp["entries"]
         .as_array()
-        .ok_or_else(|| anyhow::anyhow!("expected array of access tokens"))?
+        .ok_or_else(|| anyhow::anyhow!("expected entries array in access tokens response"))?
         .clone();
     Ok(tokens)
 }

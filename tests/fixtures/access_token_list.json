@@ -1,14 +1,48 @@
-[
-  {
-    "id": "11111111",
-    "creator": "admin",
-    "creation_time": "2025-01-01T00:00:00Z",
-    "expiration_time": "2026-01-01T00:00:00Z"
-  },
-  {
-    "id": "22222222",
-    "creator": "admin",
-    "creation_time": "2025-06-01T00:00:00Z",
-    "expiration_time": "2026-06-01T00:00:00Z"
-  }
-]
+{
+  "entries": [
+    {
+      "id": "11111111",
+      "user": {
+        "domain": "LOCAL",
+        "auth_id": "500",
+        "uid": 0,
+        "gid": 0,
+        "sid": "S-1-1-0",
+        "name": "admin"
+      },
+      "creator": {
+        "domain": "LOCAL",
+        "auth_id": "500",
+        "uid": 0,
+        "gid": 0,
+        "sid": "S-1-1-0",
+        "name": "admin"
+      },
+      "creation_time": "2025-01-01T00:00:00Z",
+      "expiration_time": "2026-01-01T00:00:00Z",
+      "enabled": true
+    },
+    {
+      "id": "22222222",
+      "user": {
+        "domain": "LOCAL",
+        "auth_id": "500",
+        "uid": 0,
+        "gid": 0,
+        "sid": "S-1-1-0",
+        "name": "admin"
+      },
+      "creator": {
+        "domain": "LOCAL",
+        "auth_id": "500",
+        "uid": 0,
+        "gid": 0,
+        "sid": "S-1-1-0",
+        "name": "admin"
+      },
+      "creation_time": "2025-06-01T00:00:00Z",
+      "expiration_time": "2026-06-01T00:00:00Z",
+      "enabled": true
+    }
+  ]
+}
