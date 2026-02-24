@@ -1,5 +1,6 @@
 use console::Style;
 use petgraph::visit::EdgeRef;
+use std::collections::BTreeMap;
 
 use super::types::*;
 
@@ -22,8 +23,7 @@ pub fn render(graph: &CdfGraph, detail: bool) -> String {
         return out;
     }
 
-    let layout = compute_layout(graph);
-    render_graph(&mut out, graph, &layout, detail);
+    render_tree(&mut out, graph, detail);
     out
 }
 
@@ -45,203 +45,28 @@ fn style_object() -> Style {
     Style::new().yellow()
 }
 
-fn style_unknown() -> Style {
-    Style::new().dim()
+fn style_disabled() -> Style {
+    Style::new().red()
 }
 
-fn style_s3() -> Style {
-    Style::new().yellow()
-}
-
-// ── Layout computation ──────────────────────────────────────────────────────
-
-/// Assigned position for a node in the layered layout.
-struct NodeLayout {
-    layer: usize,
-    pos: usize, // position within layer (0-based)
-}
-
-/// Full layout result.
-struct Layout {
-    nodes: Vec<NodeLayout>, // indexed by petgraph NodeIndex
-    num_layers: usize,
-    _max_per_layer: usize,
-}
-
-fn compute_layout(graph: &CdfGraph) -> Layout {
-    let node_count = graph.node_count();
-    if node_count == 0 {
-        return Layout {
-            nodes: vec![],
-            num_layers: 0,
-            _max_per_layer: 0,
-        };
-    }
-
-    // Build edge list for rust-sugiyama (u32 pairs)
-    let edges: Vec<(u32, u32)> = graph
-        .edge_references()
-        .map(|e| (e.source().index() as u32, e.target().index() as u32))
-        .collect();
-
-    let config = rust_sugiyama::configure::Config::default();
-
-    // rust-sugiyama returns Vec<(Vec<(usize, (f64, f64))>, f64, f64)>
-    // Each element is a connected component: (node_coords, width, height)
-    let components = if edges.is_empty() {
-        // No edges — each node is its own component, place in single layer
-        vec![]
-    } else {
-        rust_sugiyama::from_edges(&edges, &config)
-    };
-
-    // Build a map from node index -> (x, y) coordinates
-    let mut coord_map: Vec<Option<(f64, f64)>> = vec![None; node_count];
-
-    // Offset components horizontally so they don't overlap
-    let mut x_offset = 0.0_f64;
-    for (coords, width, _height) in &components {
-        for &(node_idx, (x, y)) in coords {
-            if node_idx < node_count {
-                coord_map[node_idx] = Some((x + x_offset, y));
-            }
-        }
-        x_offset += width + 2.0; // gap between components
-    }
-
-    // Assign any unplaced nodes (isolated nodes not in edges)
-    let mut isolated_x = x_offset;
-    for i in 0..node_count {
-        if coord_map[i].is_none() {
-            coord_map[i] = Some((isolated_x, 0.0));
-            isolated_x += 1.0;
-        }
-    }
-
-    // Convert floating coordinates to discrete layers.
-    // Y-axis = layer (top to bottom), X-axis = position within layer.
-    // Quantize Y values to layer indices.
-    let mut y_values: Vec<f64> = coord_map
-        .iter()
-        .filter_map(|c| c.map(|(_, y)| y))
-        .collect();
-    y_values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-    y_values.dedup_by(|a, b| (*a - *b).abs() < 0.5);
-
-    let num_layers = y_values.len().max(1);
-
-    let mut nodes = Vec::with_capacity(node_count);
-    let mut layer_counts = vec![0usize; num_layers];
-
-    // First pass: assign layers
-    let mut layer_assignments: Vec<usize> = Vec::with_capacity(node_count);
-    for i in 0..node_count {
-        let (_, y) = coord_map[i].unwrap_or((0.0, 0.0));
-        let layer = y_values
-            .iter()
-            .position(|&yv| (yv - y).abs() < 0.5)
-            .unwrap_or(0);
-        layer_assignments.push(layer);
-    }
-
-    // Collect nodes per layer and sort by x within each layer
-    let mut layer_nodes: Vec<Vec<(usize, f64)>> = vec![vec![]; num_layers];
-    for i in 0..node_count {
-        let (x, _) = coord_map[i].unwrap_or((0.0, 0.0));
-        layer_nodes[layer_assignments[i]].push((i, x));
-    }
-    for layer in &mut layer_nodes {
-        layer.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
-    }
-
-    // Assign positions
-    let mut node_positions = vec![(0usize, 0usize); node_count]; // (layer, pos)
-    for (layer_idx, layer) in layer_nodes.iter().enumerate() {
-        for (pos, &(node_idx, _)) in layer.iter().enumerate() {
-            node_positions[node_idx] = (layer_idx, pos);
-            layer_counts[layer_idx] = pos + 1;
-        }
-    }
-
-    let max_per_layer = layer_counts.iter().copied().max().unwrap_or(1);
-
-    for i in 0..node_count {
-        let (layer, pos) = node_positions[i];
-        nodes.push(NodeLayout { layer, pos });
-    }
-
-    Layout {
-        nodes,
-        num_layers,
-        _max_per_layer: max_per_layer,
-    }
-}
-
-// ── Rendering ───────────────────────────────────────────────────────────────
-
-const NODE_MIN_WIDTH: usize = 20;
-const NODE_SPACING: usize = 6;
-
-fn render_header(out: &mut String, graph: &CdfGraph) {
-    let bold = style_bold();
-    let title = "═══ Data Fabric Topology ";
-    let padding = 80_usize.saturating_sub(title.len());
-    out.push_str(&format!(
-        "{}\n",
-        bold.apply_to(format!("{}{}", title, "═".repeat(padding)))
-    ));
-    out.push_str(&format!(
-        "  {} clusters, {} relationships\n\n",
-        graph.node_count(),
-        graph.edge_count()
-    ));
-}
-
-fn render_single_node(out: &mut String, graph: &CdfGraph) {
-    for idx in graph.node_indices() {
-        let node = &graph[idx];
-        out.push_str(&format!("  {}\n", format_node_box(node, false)));
-    }
-}
-
-fn render_graph(out: &mut String, graph: &CdfGraph, layout: &Layout, detail: bool) {
-    // Collect nodes per layer
-    let mut layers: Vec<Vec<petgraph::graph::NodeIndex>> = vec![vec![]; layout.num_layers];
-    for idx in graph.node_indices() {
-        let nl = &layout.nodes[idx.index()];
-        layers[nl.layer].push(idx);
-    }
-
-    // Sort nodes within each layer by position
-    for layer in &mut layers {
-        layer.sort_by_key(|idx| layout.nodes[idx.index()].pos);
-    }
-
-    // Calculate the width each node needs
-    let node_widths: Vec<usize> = graph
-        .node_indices()
-        .map(|idx| node_display_width(&graph[idx], detail))
-        .collect();
-
-    // Render layer by layer
-    for (layer_idx, layer_nodes) in layers.iter().enumerate() {
-        // Render node boxes for this layer
-        render_layer_nodes(out, graph, layer_nodes, &node_widths, detail);
-
-        // Render edges from this layer to next layers
-        if layer_idx < layout.num_layers - 1 {
-            render_layer_edges(out, graph, layout, layer_nodes, &node_widths, detail);
-        }
-    }
-}
-
-fn node_display_width(node: &CdfNode, _detail: bool) -> usize {
-    let label = node_label(node);
-    // Box adds 4 chars (│ + space on each side + │), min width
-    (label.len() + 4).max(NODE_MIN_WIDTH)
-}
+// ── Node labels ─────────────────────────────────────────────────────────────
 
 fn node_label(node: &CdfNode) -> String {
+    match node {
+        CdfNode::ProfiledCluster { name, .. } => name.clone(),
+        CdfNode::UnknownCluster { address, .. } => {
+            if address.is_empty() {
+                "unknown".to_string()
+            } else {
+                format!("{} (unknown)", address)
+            }
+        }
+        CdfNode::S3Bucket { bucket, .. } => format!("S3:{}", bucket),
+    }
+}
+
+#[cfg(test)]
+fn node_label_full(node: &CdfNode) -> String {
     match node {
         CdfNode::ProfiledCluster { name, .. } => name.clone(),
         CdfNode::UnknownCluster { address, .. } => {
@@ -265,223 +90,314 @@ fn node_type_label(node: &CdfNode) -> &'static str {
     }
 }
 
-fn format_node_box(node: &CdfNode, detail: bool) -> String {
-    let label = node_label(node);
-    let type_label = node_type_label(node);
-    let inner_width = label.len().max(type_label.len()).max(NODE_MIN_WIDTH - 4);
+// ── Rendering ───────────────────────────────────────────────────────────────
 
-    let (top, bot, side) = match node {
-        CdfNode::ProfiledCluster { .. } => ("─", "─", "│"),
-        CdfNode::UnknownCluster { .. } => ("╌", "╌", "┊"),
-        CdfNode::S3Bucket { .. } => ("─", "─", "│"),
-    };
-
-    let mut lines = Vec::new();
-
-    // Top border
-    match node {
-        CdfNode::S3Bucket { .. } => {
-            lines.push(format!("〔{}〕", top.repeat(inner_width + 2)));
-        }
-        _ => {
-            lines.push(format!("┌{}┐", top.repeat(inner_width + 2)));
-        }
-    }
-
-    // Label line
-    let padded = format!("{:^width$}", label, width = inner_width);
-    lines.push(format!("{} {} {}", side, padded, side));
-
-    // Type line
-    let type_padded = format!("{:^width$}", type_label, width = inner_width);
-    lines.push(format!(
-        "{} {} {}",
-        side,
-        Style::new().dim().apply_to(type_padded),
-        side
+fn render_header(out: &mut String, graph: &CdfGraph) {
+    let bold = style_bold();
+    let title = "═══ Data Fabric Topology ";
+    let padding = 80_usize.saturating_sub(title.len());
+    out.push_str(&format!(
+        "{}\n",
+        bold.apply_to(format!("{}{}", title, "═".repeat(padding)))
     ));
-
-    // Detail lines
-    if detail {
-        if let Some(detail_line) = node_detail_line(node) {
-            let det_padded = format!("{:^width$}", detail_line, width = inner_width);
-            lines.push(format!("{} {} {}", side, det_padded, side));
-        }
-    }
-
-    // Bottom border
-    match node {
-        CdfNode::S3Bucket { .. } => {
-            lines.push(format!("〔{}〕", bot.repeat(inner_width + 2)));
-        }
-        _ => {
-            lines.push(format!("└{}┘", bot.repeat(inner_width + 2)));
-        }
-    }
-
-    lines.join("\n")
+    out.push_str(&format!(
+        "  {} clusters, {} relationships\n\n",
+        graph.node_count(),
+        graph.edge_count()
+    ));
 }
 
-fn node_detail_line(node: &CdfNode) -> Option<String> {
-    match node {
-        CdfNode::ProfiledCluster { address, uuid, .. } => {
-            Some(format!("{} ({})", address, &uuid[..8.min(uuid.len())]))
-        }
-        CdfNode::UnknownCluster { uuid, .. } => {
-            uuid.as_ref().map(|u| format!("uuid: {}", &u[..8.min(u.len())]))
-        }
-        CdfNode::S3Bucket { region, .. } => {
-            region.as_ref().map(|r| format!("region: {}", r))
-        }
+fn render_single_node(out: &mut String, graph: &CdfGraph) {
+    for idx in graph.node_indices() {
+        let node = &graph[idx];
+        let label = node_label(node);
+        let type_label = node_type_label(node);
+        out.push_str(&format!(
+            "  {} ({})\n",
+            style_bold().apply_to(&label),
+            Style::new().dim().apply_to(type_label)
+        ));
     }
 }
 
-fn render_layer_nodes(
-    out: &mut String,
-    graph: &CdfGraph,
-    layer_nodes: &[petgraph::graph::NodeIndex],
-    node_widths: &[usize],
-    detail: bool,
-) {
-    if layer_nodes.is_empty() {
-        return;
-    }
+/// Key for grouping duplicate edges: (edge_type_tag, short_label, disabled).
+/// Edges with the same key to the same target get collapsed with a count.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+struct EdgeGroupKey {
+    type_tag: &'static str, // "portal", "replication", "S3"
+    short_label: String,    // e.g. "continuous", "read write", "copy-to"
+    disabled: bool,
+}
 
-    // Build multi-line boxes for each node
-    let boxes: Vec<Vec<String>> = layer_nodes
-        .iter()
-        .map(|&idx| {
-            let node = &graph[idx];
-            let box_str = format_node_box(node, detail);
-            box_str.lines().map(String::from).collect()
-        })
+struct EdgeGroupValue {
+    count: usize,
+    /// One representative edge for detail rendering
+    representative: usize, // index into edges vec
+}
+
+fn edge_group_key(edge: &CdfEdge) -> EdgeGroupKey {
+    match edge {
+        CdfEdge::Portal { portal_type, .. } => {
+            let short = portal_type
+                .strip_prefix("PORTAL_")
+                .unwrap_or(portal_type)
+                .to_lowercase()
+                .replace('_', " ");
+            EdgeGroupKey {
+                type_tag: "portal",
+                short_label: short,
+                disabled: false,
+            }
+        }
+        CdfEdge::Replication { mode, enabled, .. } => {
+            let short = mode
+                .as_deref()
+                .and_then(|m| m.strip_prefix("REPLICATION_"))
+                .unwrap_or(mode.as_deref().unwrap_or("?"))
+                .to_lowercase();
+            EdgeGroupKey {
+                type_tag: "replication",
+                short_label: short,
+                disabled: !enabled,
+            }
+        }
+        CdfEdge::ObjectReplication { direction, .. } => {
+            let dir = direction.as_deref().unwrap_or("?");
+            let short = match dir {
+                "COPY_TO_OBJECT" => "copy-to",
+                "COPY_FROM_OBJECT" => "copy-from",
+                other => other,
+            };
+            EdgeGroupKey {
+                type_tag: "S3",
+                short_label: short.to_string(),
+                disabled: false,
+            }
+        }
+    }
+}
+
+fn style_for_edge(edge: &CdfEdge) -> Style {
+    match edge {
+        CdfEdge::Portal { .. } => style_portal(),
+        CdfEdge::Replication { enabled, .. } if !enabled => style_disabled(),
+        CdfEdge::Replication { .. } => style_replication(),
+        CdfEdge::ObjectReplication { .. } => style_object(),
+    }
+}
+
+fn render_tree(out: &mut String, graph: &CdfGraph, detail: bool) {
+    // Collect all source nodes that have outgoing edges, ordered by label
+    let mut source_nodes: Vec<petgraph::graph::NodeIndex> = graph
+        .node_indices()
+        .filter(|&idx| graph.edges(idx).next().is_some())
         .collect();
+    source_nodes.sort_by(|a, b| node_label(&graph[*a]).cmp(&node_label(&graph[*b])));
 
-    // Find max height across all boxes in this layer
-    let max_height = boxes.iter().map(|b| b.len()).max().unwrap_or(0);
+    // Also collect isolated nodes (no outgoing edges, but may have incoming)
+    // and truly isolated nodes (no edges at all)
+    let mut mentioned_as_target: std::collections::HashSet<petgraph::graph::NodeIndex> =
+        std::collections::HashSet::new();
+    for idx in graph.node_indices() {
+        for edge in graph.edges(idx) {
+            mentioned_as_target.insert(edge.target());
+        }
+    }
 
-    // Render line by line, placing boxes side by side
-    for line_idx in 0..max_height {
-        let mut line = String::from("  "); // left margin
-        for (i, (box_lines, &node_idx)) in boxes.iter().zip(layer_nodes.iter()).enumerate() {
-            let w = node_widths[node_idx.index()];
-            if line_idx < box_lines.len() {
-                let raw = &box_lines[line_idx];
-                // Apply node-specific styling
-                let styled = style_node_line(&graph[node_idx], raw);
-                line.push_str(&styled);
-                // Pad to fixed width (accounting for ANSI codes in styled text)
-                let visible_len = console::measure_text_width(raw);
-                if visible_len < w {
-                    line.push_str(&" ".repeat(w - visible_len));
+    for (src_i, &src_idx) in source_nodes.iter().enumerate() {
+        let src_node = &graph[src_idx];
+        let src_label = node_label(src_node);
+        let type_label = node_type_label(src_node);
+
+        // Source header
+        out.push_str(&format!(
+            "{} ({})\n",
+            style_bold().apply_to(&src_label),
+            Style::new().dim().apply_to(type_label)
+        ));
+
+        // Group edges by target, then by edge key
+        // Use BTreeMap for stable ordering
+        let mut targets: BTreeMap<
+            petgraph::graph::NodeIndex,
+            BTreeMap<EdgeGroupKey, EdgeGroupValue>,
+        > = BTreeMap::new();
+        let mut edge_store: Vec<CdfEdge> = Vec::new();
+
+        for edge_ref in graph.edges(src_idx) {
+            let tgt_idx = edge_ref.target();
+            let edge = edge_ref.weight().clone();
+            let key = edge_group_key(&edge);
+            let edge_i = edge_store.len();
+            edge_store.push(edge);
+
+            let target_groups = targets.entry(tgt_idx).or_default();
+            target_groups
+                .entry(key)
+                .and_modify(|v| v.count += 1)
+                .or_insert(EdgeGroupValue {
+                    count: 1,
+                    representative: edge_i,
+                });
+        }
+
+        // Sort targets by label for stable output
+        let mut target_entries: Vec<_> = targets.into_iter().collect();
+        target_entries.sort_by(|a, b| node_label(&graph[a.0]).cmp(&node_label(&graph[b.0])));
+
+        let num_targets = target_entries.len();
+        for (tgt_i, (tgt_idx, groups)) in target_entries.into_iter().enumerate() {
+            let tgt_label = node_label(&graph[tgt_idx]);
+            let is_last_target = tgt_i == num_targets - 1;
+
+            // Collect all edge group descriptions for this target into one line
+            let mut edge_parts: Vec<String> = Vec::new();
+            let mut edge_styles: Vec<Style> = Vec::new();
+
+            let groups_vec: Vec<_> = groups.into_iter().collect();
+            for (key, value) in &groups_vec {
+                let edge = &edge_store[value.representative];
+                let style = style_for_edge(edge);
+
+                let mut part = format!("{} ({})", key.type_tag, key.short_label);
+                if key.disabled {
+                    part.push_str(" [DISABLED]");
                 }
+                if value.count > 1 {
+                    part.push_str(&format!(" x{}", value.count));
+                }
+                edge_parts.push(part);
+                edge_styles.push(style);
+            }
+
+            // Build the line
+            let connector = if is_last_target { "└── " } else { "├── " };
+            out.push_str(connector);
+            out.push_str(&format!("→ {}: ", style_bold().apply_to(&tgt_label)));
+
+            for (i, (part, style)) in edge_parts.iter().zip(edge_styles.iter()).enumerate() {
+                if i > 0 {
+                    out.push_str(", ");
+                }
+                out.push_str(&format!("{}", style.apply_to(part)));
+            }
+            out.push('\n');
+
+            // Detail lines for each edge group
+            if detail {
+                for (key, value) in &groups_vec {
+                    let edge = &edge_store[value.representative];
+                    if let Some(detail_str) = format_edge_detail(edge) {
+                        let prefix = if is_last_target {
+                            "    "
+                        } else {
+                            "│   "
+                        };
+                        out.push_str(&format!(
+                            "{}  {} ({}): {}\n",
+                            prefix,
+                            key.type_tag,
+                            key.short_label,
+                            Style::new().dim().apply_to(&detail_str)
+                        ));
+                    }
+                }
+            }
+        }
+
+        // Blank line between source clusters (except after last)
+        if src_i < source_nodes.len() - 1 {
+            out.push('\n');
+        }
+    }
+
+    // Show isolated nodes that are only targets (no outgoing edges) and not sources
+    let source_set: std::collections::HashSet<_> = source_nodes.iter().copied().collect();
+    let mut isolated: Vec<_> = graph
+        .node_indices()
+        .filter(|idx| !source_set.contains(idx) && !mentioned_as_target.contains(idx))
+        .collect();
+    isolated.sort_by(|a, b| node_label(&graph[*a]).cmp(&node_label(&graph[*b])));
+
+    if !isolated.is_empty() {
+        if !source_nodes.is_empty() {
+            out.push('\n');
+        }
+        for idx in &isolated {
+            let node = &graph[*idx];
+            let label = node_label(node);
+            let type_label = node_type_label(node);
+            out.push_str(&format!(
+                "{} ({}) — no relationships\n",
+                style_bold().apply_to(&label),
+                Style::new().dim().apply_to(type_label),
+            ));
+        }
+    }
+}
+
+fn format_edge_detail(edge: &CdfEdge) -> Option<String> {
+    match edge {
+        CdfEdge::Portal { state, status, .. } => {
+            Some(format!("state={}, status={}", state, status))
+        }
+        CdfEdge::Replication {
+            source_path,
+            target_path,
+            state,
+            job_state,
+            recovery_point,
+            error_from_last_job,
+            ..
+        } => {
+            let mut parts = Vec::new();
+            if let (Some(sp), Some(tp)) = (source_path.as_deref(), target_path.as_deref()) {
+                parts.push(format!("{} → {}", sp, tp));
+            }
+            if let Some(s) = state.as_deref() {
+                parts.push(format!("state={}", s));
+            }
+            if let Some(js) = job_state.as_deref() {
+                parts.push(format!("job={}", js));
+            }
+            if let Some(rp) = recovery_point.as_deref() {
+                parts.push(format!("rp={}", rp));
+            }
+            if let Some(err) = error_from_last_job.as_deref() {
+                parts.push(format!("error={}", err));
+            }
+            if parts.is_empty() {
+                None
             } else {
-                line.push_str(&" ".repeat(w));
-            }
-            if i < layer_nodes.len() - 1 {
-                line.push_str(&" ".repeat(NODE_SPACING));
+                Some(parts.join(", "))
             }
         }
-        out.push_str(&line);
-        out.push('\n');
+        CdfEdge::ObjectReplication {
+            bucket,
+            folder,
+            state,
+            ..
+        } => {
+            let mut parts = Vec::new();
+            if let Some(b) = bucket.as_deref() {
+                parts.push(format!("bucket={}", b));
+            }
+            if let Some(f) = folder.as_deref() {
+                parts.push(format!("folder={}", f));
+            }
+            if let Some(s) = state.as_deref() {
+                parts.push(format!("state={}", s));
+            }
+            if parts.is_empty() {
+                None
+            } else {
+                Some(parts.join(", "))
+            }
+        }
     }
 }
 
-fn style_node_line(node: &CdfNode, line: &str) -> String {
-    match node {
-        CdfNode::ProfiledCluster { .. } => {
-            // Bold the label line (contains the name), dim the type line
-            line.to_string()
-        }
-        CdfNode::UnknownCluster { .. } => {
-            style_unknown().apply_to(line).to_string()
-        }
-        CdfNode::S3Bucket { .. } => {
-            style_s3().apply_to(line).to_string()
-        }
-    }
-}
-
-fn render_layer_edges(
-    out: &mut String,
-    graph: &CdfGraph,
-    layout: &Layout,
-    layer_nodes: &[petgraph::graph::NodeIndex],
-    node_widths: &[usize],
-    detail: bool,
-) {
-    // Collect edges from this layer's nodes to lower layers
-    let mut edges_to_render: Vec<(petgraph::graph::NodeIndex, petgraph::graph::NodeIndex, &CdfEdge)> = Vec::new();
-
-    for &src_idx in layer_nodes {
-        for edge in graph.edges(src_idx) {
-            let tgt_idx = edge.target();
-            if layout.nodes[tgt_idx.index()].layer > layout.nodes[src_idx.index()].layer {
-                edges_to_render.push((src_idx, tgt_idx, edge.weight()));
-            }
-        }
-    }
-
-    // Also check incoming edges (for edges going upward in the layout — reversed by sugiyama)
-    for &src_idx in layer_nodes {
-        for edge in graph.edges_directed(src_idx, petgraph::Direction::Incoming) {
-            let from_idx = edge.source();
-            if layout.nodes[from_idx.index()].layer > layout.nodes[src_idx.index()].layer {
-                // This edge goes from a lower layer to us — render it here too
-                edges_to_render.push((src_idx, from_idx, edge.weight()));
-            }
-        }
-    }
-
-    if edges_to_render.is_empty() {
-        out.push('\n');
-        return;
-    }
-
-    // Calculate center positions of each node in character columns
-    let node_centers: Vec<(petgraph::graph::NodeIndex, usize)> = {
-        let mut centers = Vec::new();
-        let mut col = 2; // left margin
-        for (i, &node_idx) in layer_nodes.iter().enumerate() {
-            let w = node_widths[node_idx.index()];
-            centers.push((node_idx, col + w / 2));
-            col += w;
-            if i < layer_nodes.len() - 1 {
-                col += NODE_SPACING;
-            }
-        }
-        centers
-    };
-
-    // Render each edge as a labeled connection line
-    for (src_idx, tgt_idx, edge) in &edges_to_render {
-        let src_center = node_centers
-            .iter()
-            .find(|(idx, _)| idx == src_idx)
-            .map(|(_, c)| *c)
-            .unwrap_or(2);
-
-        let edge_label = format_edge_label(edge, detail);
-        let target_name = node_label(&graph[*tgt_idx]);
-        let full_label = format!("{} → {}", edge_label, target_name);
-        let styled_label = style_edge_label(edge, &full_label);
-
-        // Draw: vertical connector from source, then arrow and label
-        let connector = " ".repeat(src_center) + "│";
-        out.push_str(&style_edge_connector(edge, &connector));
-        out.push('\n');
-
-        let arrow_line = " ".repeat(src_center) + "├── ";
-        out.push_str(&style_edge_connector(edge, &arrow_line));
-        out.push_str(&styled_label);
-        out.push('\n');
-
-        let down_arrow = " ".repeat(src_center) + "▼";
-        out.push_str(&style_edge_connector(edge, &down_arrow));
-        out.push('\n');
-    }
-}
-
+#[cfg(test)]
 fn format_edge_label(edge: &CdfEdge, detail: bool) -> String {
     match edge {
         CdfEdge::Portal {
@@ -556,23 +472,6 @@ fn format_edge_label(edge: &CdfEdge, detail: bool) -> String {
     }
 }
 
-fn style_edge_label(edge: &CdfEdge, label: &str) -> String {
-    match edge {
-        CdfEdge::Portal { .. } => style_portal().apply_to(label).to_string(),
-        CdfEdge::Replication { .. } => style_replication().apply_to(label).to_string(),
-        CdfEdge::ObjectReplication { .. } => style_object().apply_to(label).to_string(),
-    }
-}
-
-fn style_edge_connector(edge: &CdfEdge, text: &str) -> String {
-    let style = match edge {
-        CdfEdge::Portal { .. } => style_portal(),
-        CdfEdge::Replication { .. } => style_replication(),
-        CdfEdge::ObjectReplication { .. } => style_object(),
-    };
-    style.apply_to(text).to_string()
-}
-
 // ── Tests ───────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
@@ -637,6 +536,10 @@ mod tests {
         graph
     }
 
+    fn strip_ansi(s: &str) -> String {
+        console::strip_ansi_codes(s).to_string()
+    }
+
     #[test]
     fn test_render_empty_graph() {
         let graph = CdfGraph::new();
@@ -653,47 +556,51 @@ mod tests {
             address: "10.0.0.1".into(),
         });
         let output = render(&graph, false);
-        assert!(output.contains("lonely"));
-        assert!(output.contains("Data Fabric Topology"));
-        assert!(output.contains("1 clusters, 0 relationships"));
+        let plain = strip_ansi(&output);
+        assert!(plain.contains("lonely"));
+        assert!(plain.contains("Data Fabric Topology"));
+        assert!(plain.contains("1 clusters, 0 relationships"));
     }
 
     #[test]
     fn test_render_compact_mode() {
         let graph = make_test_graph();
         let output = render(&graph, false);
+        let plain = strip_ansi(&output);
 
         // Verify header
-        assert!(output.contains("Data Fabric Topology"));
-        assert!(output.contains("3 clusters, 3 relationships"));
+        assert!(plain.contains("Data Fabric Topology"));
+        assert!(plain.contains("3 clusters, 3 relationships"));
 
-        // Verify node names appear
-        assert!(output.contains("gravytrain"));
-        assert!(output.contains("iss"));
-        assert!(output.contains("backup-bucket"));
+        // Verify source cluster names appear as headers
+        assert!(plain.contains("gravytrain (cluster)"));
+        assert!(plain.contains("iss (cluster)"));
 
-        // Verify edge labels include target node name
-        assert!(output.contains("replication (continuous) → iss"));
-        assert!(output.contains("portal (read write) → iss"));
-        assert!(output.contains("S3 copy-to → S3: backup-bucket"));
+        // Verify edge labels with target names
+        assert!(plain.contains("→ iss:"));
+        assert!(plain.contains("replication (continuous)"));
+        assert!(plain.contains("portal (read write)"));
+        assert!(plain.contains("→ S3:backup-bucket:"));
+        assert!(plain.contains("S3 (copy-to)"));
 
         // Should NOT contain detail info in compact mode
-        assert!(!output.contains("/data"));
-        assert!(!output.contains("state=ACCEPTED"));
+        assert!(!plain.contains("/data"));
+        assert!(!plain.contains("state=ACCEPTED"));
     }
 
     #[test]
     fn test_render_detail_mode() {
         let graph = make_test_graph();
         let output = render(&graph, true);
+        let plain = strip_ansi(&output);
 
         // Detail mode should include paths, states, and target names
-        assert!(output.contains("replication (continuous)"));
-        assert!(output.contains("portal (read write)"));
-        assert!(output.contains("→ iss"));
+        assert!(plain.contains("replication (continuous)"));
+        assert!(plain.contains("portal (read write)"));
+        assert!(plain.contains("→ iss:"));
         // Detail edge info
-        assert!(output.contains("state=ACCEPTED"));
-        assert!(output.contains("status=ACTIVE"));
+        assert!(plain.contains("state=ACCEPTED"));
+        assert!(plain.contains("status=ACTIVE"));
     }
 
     #[test]
@@ -724,8 +631,10 @@ mod tests {
             },
         );
         let output = render(&graph, false);
-        assert!(output.contains("10.0.0.99 (unknown)"));
-        assert!(output.contains("replication (snapshot) → 10.0.0.99 (unknown)"));
+        let plain = strip_ansi(&output);
+        assert!(plain.contains("10.0.0.99 (unknown)"));
+        assert!(plain.contains("→ 10.0.0.99 (unknown):"));
+        assert!(plain.contains("replication (snapshot)"));
     }
 
     #[test]
@@ -757,7 +666,8 @@ mod tests {
             },
         );
         let output = render(&graph, false);
-        assert!(output.contains("[DISABLED]"));
+        let plain = strip_ansi(&output);
+        assert!(plain.contains("[DISABLED]"));
     }
 
     #[test]
@@ -784,9 +694,10 @@ mod tests {
             },
         );
         let output = render(&graph, false);
-        assert!(output.contains("cluster-a"));
-        assert!(output.contains("my-bucket"));
-        assert!(output.contains("S3 copy-to → S3: my-bucket"));
+        let plain = strip_ansi(&output);
+        assert!(plain.contains("cluster-a"));
+        assert!(plain.contains("S3:my-bucket"));
+        assert!(plain.contains("S3 (copy-to)"));
     }
 
     #[test]
@@ -796,12 +707,13 @@ mod tests {
         // If we got here, it's valid UTF-8 (Rust strings are always valid UTF-8)
         assert!(!output.is_empty());
 
-        // Verify box-drawing characters are present
-        let has_box_chars = output.contains('┌')
-            || output.contains('└')
-            || output.contains('│')
-            || output.contains('─');
-        assert!(has_box_chars, "Output should contain box-drawing characters");
+        // Verify tree-drawing characters are present
+        let plain = strip_ansi(&output);
+        let has_tree_chars = plain.contains('├') || plain.contains('└') || plain.contains('│');
+        assert!(
+            has_tree_chars,
+            "Output should contain tree-drawing characters"
+        );
     }
 
     #[test]
@@ -831,8 +743,9 @@ mod tests {
             },
         );
         let output = render(&graph, false);
-        assert!(output.contains("10.0.0.1 (unknown)"));
-        assert!(output.contains("10.0.0.2 (unknown)"));
+        let plain = strip_ansi(&output);
+        assert!(plain.contains("10.0.0.1 (unknown)"));
+        assert!(plain.contains("10.0.0.2 (unknown)"));
     }
 
     #[test]
@@ -865,7 +778,7 @@ mod tests {
                 bucket: "bkt".into(),
                 region: None,
             }),
-            "S3: bkt @ s3.aws.com"
+            "S3:bkt"
         );
     }
 
@@ -956,52 +869,105 @@ mod tests {
             },
         );
         let output = render(&graph, false);
-        // Edge label must include " → target" to show which node it connects to
+        let plain = strip_ansi(&output);
+        // Edge label must include target name
         assert!(
-            output.contains("replication (continuous) → target"),
+            plain.contains("→ target:"),
             "Edge label should include target node name, got:\n{}",
-            output
+            plain
         );
+        assert!(plain.contains("replication (continuous)"));
     }
 
     #[test]
-    fn test_compute_layout_empty() {
-        let graph = CdfGraph::new();
-        let layout = compute_layout(&graph);
-        assert_eq!(layout.num_layers, 0);
-    }
-
-    #[test]
-    fn test_compute_layout_linear() {
+    fn test_duplicate_edges_collapsed() {
         let mut graph = CdfGraph::new();
         let n1 = graph.add_node(CdfNode::ProfiledCluster {
-            name: "a".into(),
-            uuid: "u1".into(),
-            address: "1".into(),
+            name: "gravytrain-sg".into(),
+            uuid: "uuid-1".into(),
+            address: "10.0.0.1".into(),
         });
         let n2 = graph.add_node(CdfNode::ProfiledCluster {
-            name: "b".into(),
-            uuid: "u2".into(),
-            address: "2".into(),
+            name: "iss-sg".into(),
+            uuid: "uuid-2".into(),
+            address: "10.0.0.2".into(),
         });
+
+        // Add 3 identical replication edges
+        for _ in 0..3 {
+            graph.add_edge(
+                n1,
+                n2,
+                CdfEdge::Replication {
+                    source_path: None,
+                    target_path: None,
+                    mode: Some("REPLICATION_CONTINUOUS".into()),
+                    enabled: true,
+                    state: None,
+                    job_state: None,
+                    recovery_point: None,
+                    error_from_last_job: None,
+                    replication_job_status: None,
+                },
+            );
+        }
+
+        // Add 1 portal
         graph.add_edge(
             n1,
             n2,
-            CdfEdge::Replication {
-                source_path: None,
-                target_path: None,
-                mode: None,
-                enabled: true,
-                state: None,
-                job_state: None,
-                recovery_point: None,
-                error_from_last_job: None,
-                replication_job_status: None,
+            CdfEdge::Portal {
+                hub_id: 1,
+                spoke_id: 5,
+                portal_type: "PORTAL_READ_WRITE".into(),
+                state: "ACCEPTED".into(),
+                status: "ACTIVE".into(),
             },
         );
-        let layout = compute_layout(&graph);
-        assert!(layout.num_layers >= 2);
-        // Source should be in an earlier (or equal) layer than target
-        assert!(layout.nodes[0].layer <= layout.nodes[1].layer);
+
+        let output = render(&graph, false);
+        let plain = strip_ansi(&output);
+
+        // Should show "x3" for collapsed edges
+        assert!(
+            plain.contains("x3"),
+            "Should collapse 3 duplicate edges with x3, got:\n{}",
+            plain
+        );
+        // Should show portal without count (only 1)
+        assert!(plain.contains("portal (read write)"));
+        assert!(!plain.contains("portal (read write) x"));
+    }
+
+    #[test]
+    fn test_s3_label_abbreviated() {
+        let node = CdfNode::S3Bucket {
+            address: "s3-us-west-2.amazonaws.com".into(),
+            bucket: "speqtrum-demo".into(),
+            region: Some("us-west-2".into()),
+        };
+        // Short label should be "S3:speqtrum-demo", not "S3: speqtrum-demo @ s3-us-west-2.amazonaws.com"
+        assert_eq!(node_label(&node), "S3:speqtrum-demo");
+        // Full label preserves address
+        assert_eq!(
+            node_label_full(&node),
+            "S3: speqtrum-demo @ s3-us-west-2.amazonaws.com"
+        );
+    }
+
+    #[test]
+    fn test_output_width_under_120() {
+        let graph = make_test_graph();
+        let output = render(&graph, false);
+        let plain = strip_ansi(&output);
+        for line in plain.lines() {
+            let width = console::measure_text_width(line);
+            assert!(
+                width <= 120,
+                "Line exceeds 120 display cols ({} cols): {}",
+                width,
+                line
+            );
+        }
     }
 }
