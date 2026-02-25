@@ -306,16 +306,17 @@ fn status_color(status: &str) -> Style {
 }
 
 fn truncate(s: &str, max: usize) -> String {
-    if s.len() <= max {
+    if s.chars().count() <= max {
         s.to_string()
     } else {
-        format!("{}…", &s[..max - 1])
+        let truncated: String = s.chars().take(max - 1).collect();
+        format!("{truncated}…")
     }
 }
 
 /// Pad a styled string (with ANSI codes) to a visible width.
 fn pad_styled(styled: &str, raw: &str, width: usize) -> String {
-    let visible = raw.len();
+    let visible = raw.chars().count();
     if visible >= width {
         styled.to_string()
     } else {
