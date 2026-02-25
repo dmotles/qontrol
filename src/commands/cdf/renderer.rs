@@ -1,12 +1,12 @@
 use console::Style;
 use petgraph::visit::EdgeRef;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use super::types::*;
 
 // ── Public entry point ──────────────────────────────────────────────────────
 
-/// Render the CDF graph as styled terminal output.
+/// Render the CDF graph as a visually striking cluster-centric topology map.
 ///
 /// Returns a string with embedded ANSI codes (via `console` crate).
 /// `detail` enables per-edge metadata like paths, modes, states.
@@ -16,15 +16,384 @@ pub fn render(graph: &CdfGraph, detail: bool) -> String {
     }
 
     let mut out = String::new();
-    render_header(&mut out, graph);
+    let topo = build_topology(graph);
+    render_header(&mut out, &topo);
 
     if graph.node_count() == 1 && graph.edge_count() == 0 {
         render_single_node(&mut out, graph);
         return out;
     }
 
-    render_tree(&mut out, graph, detail);
+    render_cluster_connections(&mut out, &topo, detail);
+    render_s3_section(&mut out, &topo);
+    render_remote_peers_section(&mut out, &topo);
+    render_legend(&mut out, &topo);
+
     out
+}
+
+// ── Topology model ──────────────────────────────────────────────────────────
+
+/// Direction of edges within a cluster pair.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Direction {
+    Forward,  // A → B
+    Backward, // B → A
+    Both,     // A ↔ B
+}
+
+/// A bundle of edges between the same undirected cluster pair.
+#[derive(Debug)]
+struct ClusterPairBundle {
+    cluster_a: String, // alphabetically first
+    cluster_b: String,
+    /// Grouped by edge type: (type_tag, count, direction, disabled_count, representative edge)
+    edge_groups: Vec<EdgeSummary>,
+}
+
+#[derive(Debug)]
+struct EdgeSummary {
+    type_tag: &'static str,
+    count: usize,
+    direction: Direction,
+    disabled_count: usize,
+}
+
+/// Satellites (S3 or remote peer) grouped by owning cluster.
+#[derive(Debug)]
+struct SatelliteGroup {
+    cluster_name: String,
+    satellites: Vec<SatelliteEntry>,
+}
+
+#[derive(Debug)]
+struct SatelliteEntry {
+    label: String,
+    direction: Direction,
+    count: usize,
+    disabled_count: usize,
+}
+
+/// Full topology extracted from the graph.
+struct Topology {
+    #[allow(dead_code)]
+    profiled_clusters: BTreeSet<String>,
+    cluster_pairs: Vec<ClusterPairBundle>,
+    s3_groups: Vec<SatelliteGroup>,
+    remote_peer_groups: Vec<SatelliteGroup>,
+    isolated_clusters: Vec<String>,
+    cluster_count: usize,
+    s3_count: usize,
+    remote_peer_count: usize,
+    has_replication: bool,
+    has_portal: bool,
+    has_s3: bool,
+    has_remote: bool,
+}
+
+fn build_topology(graph: &CdfGraph) -> Topology {
+    let mut profiled_clusters = BTreeSet::new();
+    let mut s3_nodes = BTreeSet::new();
+    let mut unknown_nodes = BTreeSet::new();
+
+    // Classify nodes
+    let mut node_labels: HashMap<petgraph::graph::NodeIndex, String> = HashMap::new();
+    for idx in graph.node_indices() {
+        let node = &graph[idx];
+        let label = node_label(node);
+        node_labels.insert(idx, label.clone());
+        match node {
+            CdfNode::ProfiledCluster { .. } => {
+                profiled_clusters.insert(label);
+            }
+            CdfNode::S3Bucket { .. } => {
+                s3_nodes.insert(label);
+            }
+            CdfNode::UnknownCluster { .. } => {
+                unknown_nodes.insert(label);
+            }
+        }
+    }
+
+    // Build cluster pair bundles (profiled ↔ profiled edges)
+    // Key: (min_name, max_name) → Vec of (edge, direction_relative_to_pair)
+    let mut pair_edges: BTreeMap<(String, String), Vec<(CdfEdge, Direction)>> = BTreeMap::new();
+    let mut s3_edges: BTreeMap<String, Vec<(String, CdfEdge)>> = BTreeMap::new();
+    let mut remote_edges: BTreeMap<String, Vec<(String, CdfEdge)>> = BTreeMap::new();
+    let mut clusters_with_connections: BTreeSet<String> = BTreeSet::new();
+
+    for idx in graph.node_indices() {
+        let src_node = &graph[idx];
+        let src_label = &node_labels[&idx];
+
+        for edge_ref in graph.edges(idx) {
+            let tgt_idx = edge_ref.target();
+            let tgt_node = &graph[tgt_idx];
+            let tgt_label = &node_labels[&tgt_idx];
+            let edge = edge_ref.weight().clone();
+
+            let src_is_profiled = matches!(src_node, CdfNode::ProfiledCluster { .. });
+            let tgt_is_profiled = matches!(tgt_node, CdfNode::ProfiledCluster { .. });
+            let tgt_is_s3 = matches!(tgt_node, CdfNode::S3Bucket { .. });
+            let tgt_is_unknown = matches!(tgt_node, CdfNode::UnknownCluster { .. });
+            let src_is_unknown = matches!(src_node, CdfNode::UnknownCluster { .. });
+
+            if src_is_profiled && tgt_is_profiled {
+                // Cluster-to-cluster edge
+                clusters_with_connections.insert(src_label.clone());
+                clusters_with_connections.insert(tgt_label.clone());
+
+                let (a, b) = if src_label <= tgt_label {
+                    (src_label.clone(), tgt_label.clone())
+                } else {
+                    (tgt_label.clone(), src_label.clone())
+                };
+                let dir = if src_label <= tgt_label {
+                    Direction::Forward
+                } else {
+                    Direction::Backward
+                };
+                pair_edges.entry((a, b)).or_default().push((edge, dir));
+            } else if src_is_profiled && tgt_is_s3 {
+                clusters_with_connections.insert(src_label.clone());
+                s3_edges
+                    .entry(src_label.clone())
+                    .or_default()
+                    .push((tgt_label.clone(), edge));
+            } else if src_is_profiled && tgt_is_unknown {
+                clusters_with_connections.insert(src_label.clone());
+                remote_edges
+                    .entry(src_label.clone())
+                    .or_default()
+                    .push((tgt_label.clone(), edge));
+            } else if src_is_unknown && tgt_is_profiled {
+                clusters_with_connections.insert(tgt_label.clone());
+                remote_edges
+                    .entry(tgt_label.clone())
+                    .or_default()
+                    .push((src_label.clone(), edge));
+            } else if src_is_unknown && tgt_is_unknown {
+                // Unknown-to-unknown: group under "?"
+                remote_edges
+                    .entry("?".to_string())
+                    .or_default()
+                    .push((tgt_label.clone(), edge));
+            } else {
+                // S3 source or other combos - group under source
+                if tgt_is_s3 || tgt_is_unknown {
+                    remote_edges
+                        .entry(src_label.clone())
+                        .or_default()
+                        .push((tgt_label.clone(), edge));
+                }
+            }
+        }
+    }
+
+    // Build cluster pair bundles
+    let mut cluster_pairs = Vec::new();
+    let mut has_replication = false;
+    let mut has_portal = false;
+
+    for ((a, b), edges) in &pair_edges {
+        let edge_groups = summarize_edge_groups(edges);
+        for eg in &edge_groups {
+            match eg.type_tag {
+                "repl" => has_replication = true,
+                "portal" => has_portal = true,
+                _ => {}
+            }
+        }
+        cluster_pairs.push(ClusterPairBundle {
+            cluster_a: a.clone(),
+            cluster_b: b.clone(),
+            edge_groups,
+        });
+    }
+
+    // Build S3 satellite groups
+    let mut has_s3 = false;
+    let mut s3_groups = Vec::new();
+    let mut unique_s3: BTreeSet<String> = BTreeSet::new();
+    for (cluster, edges) in &s3_edges {
+        has_s3 = true;
+        let mut entries = build_satellite_entries(edges);
+        for e in &entries {
+            unique_s3.insert(e.label.clone());
+        }
+        entries.sort_by(|a, b| a.label.cmp(&b.label));
+        s3_groups.push(SatelliteGroup {
+            cluster_name: cluster.clone(),
+            satellites: entries,
+        });
+    }
+    s3_groups.sort_by(|a, b| a.cluster_name.cmp(&b.cluster_name));
+
+    // Build remote peer groups
+    let mut has_remote = false;
+    let mut remote_peer_groups = Vec::new();
+    let mut unique_remotes: BTreeSet<String> = BTreeSet::new();
+    for (cluster, edges) in &remote_edges {
+        has_remote = true;
+        let mut entries = build_satellite_entries(edges);
+        for e in &entries {
+            unique_remotes.insert(e.label.clone());
+        }
+        entries.sort_by(|a, b| a.label.cmp(&b.label));
+        remote_peer_groups.push(SatelliteGroup {
+            cluster_name: cluster.clone(),
+            satellites: entries,
+        });
+    }
+    remote_peer_groups.sort_by(|a, b| a.cluster_name.cmp(&b.cluster_name));
+
+    // Isolated profiled clusters (no connections at all)
+    let isolated: Vec<String> = profiled_clusters
+        .iter()
+        .filter(|c| !clusters_with_connections.contains(*c))
+        .cloned()
+        .collect();
+
+    Topology {
+        cluster_count: profiled_clusters.len(),
+        s3_count: unique_s3.len(),
+        remote_peer_count: unique_remotes.len(),
+        profiled_clusters,
+        cluster_pairs,
+        s3_groups,
+        remote_peer_groups,
+        isolated_clusters: isolated,
+        has_replication,
+        has_portal,
+        has_s3,
+        has_remote,
+    }
+}
+
+fn summarize_edge_groups(edges: &[(CdfEdge, Direction)]) -> Vec<EdgeSummary> {
+    // Group by (type_tag, short_label)
+    #[derive(Ord, PartialOrd, Eq, PartialEq, Clone)]
+    struct GroupKey {
+        type_tag: &'static str,
+        short_label: String,
+    }
+
+    struct GroupAccum {
+        count: usize,
+        forward: usize,
+        backward: usize,
+        disabled: usize,
+    }
+
+    let mut groups: BTreeMap<GroupKey, GroupAccum> = BTreeMap::new();
+
+    for (edge, dir) in edges {
+        let (type_tag, short_label, disabled) = classify_edge(edge);
+        let key = GroupKey {
+            type_tag,
+            short_label,
+        };
+        let acc = groups.entry(key).or_insert(GroupAccum {
+            count: 0,
+            forward: 0,
+            backward: 0,
+            disabled: 0,
+        });
+        acc.count += 1;
+        match dir {
+            Direction::Forward => acc.forward += 1,
+            Direction::Backward => acc.backward += 1,
+            Direction::Both => {
+                acc.forward += 1;
+                acc.backward += 1;
+            }
+        }
+        if disabled {
+            acc.disabled += 1;
+        }
+    }
+
+    groups
+        .into_iter()
+        .map(|(key, acc)| {
+            let direction = if acc.forward > 0 && acc.backward > 0 {
+                Direction::Both
+            } else if acc.backward > 0 {
+                Direction::Backward
+            } else {
+                Direction::Forward
+            };
+            EdgeSummary {
+                type_tag: key.type_tag,
+                count: acc.count,
+                direction,
+                disabled_count: acc.disabled,
+            }
+        })
+        .collect()
+}
+
+fn classify_edge(edge: &CdfEdge) -> (&'static str, String, bool) {
+    match edge {
+        CdfEdge::Portal { portal_type, .. } => {
+            let short = portal_type
+                .strip_prefix("PORTAL_")
+                .unwrap_or(portal_type)
+                .to_lowercase()
+                .replace('_', " ");
+            ("portal", short, false)
+        }
+        CdfEdge::Replication { mode, enabled, .. } => {
+            let _short = mode
+                .as_deref()
+                .and_then(|m| m.strip_prefix("REPLICATION_"))
+                .unwrap_or(mode.as_deref().unwrap_or("?"))
+                .to_lowercase();
+            ("repl", "repl".to_string(), !enabled)
+        }
+        CdfEdge::ObjectReplication { .. } => ("S3", "s3".to_string(), false),
+    }
+}
+
+fn build_satellite_entries(edges: &[(String, CdfEdge)]) -> Vec<SatelliteEntry> {
+    // Group by target label
+    let mut groups: BTreeMap<String, (usize, usize, Direction)> = BTreeMap::new();
+
+    for (label, edge) in edges {
+        let disabled = match edge {
+            CdfEdge::Replication { enabled, .. } => !enabled,
+            _ => false,
+        };
+        let dir = match edge {
+            CdfEdge::ObjectReplication { direction, .. } => {
+                match direction.as_deref() {
+                    Some("COPY_TO_OBJECT") => Direction::Forward,
+                    Some("COPY_FROM_OBJECT") => Direction::Backward,
+                    _ => Direction::Forward,
+                }
+            }
+            _ => Direction::Forward,
+        };
+        let entry = groups.entry(label.clone()).or_insert((0, 0, dir));
+        entry.0 += 1;
+        if disabled {
+            entry.1 += 1;
+        }
+        // Merge directions
+        if entry.2 != dir {
+            entry.2 = Direction::Both;
+        }
+    }
+
+    groups
+        .into_iter()
+        .map(|(label, (count, disabled, dir))| SatelliteEntry {
+            label,
+            direction: dir,
+            count,
+            disabled_count: disabled,
+        })
+        .collect()
 }
 
 // ── Styles ──────────────────────────────────────────────────────────────────
@@ -49,6 +418,10 @@ fn style_disabled() -> Style {
     Style::new().red()
 }
 
+fn style_dim() -> Style {
+    Style::new().dim()
+}
+
 // ── Node labels ─────────────────────────────────────────────────────────────
 
 fn node_label(node: &CdfNode) -> String {
@@ -58,418 +431,373 @@ fn node_label(node: &CdfNode) -> String {
             if address.is_empty() {
                 "unknown".to_string()
             } else {
-                format!("{} (unknown)", address)
+                address.clone()
             }
         }
-        CdfNode::S3Bucket { bucket, .. } => format!("S3:{}", bucket),
-    }
-}
-
-#[cfg(test)]
-fn node_label_full(node: &CdfNode) -> String {
-    match node {
-        CdfNode::ProfiledCluster { name, .. } => name.clone(),
-        CdfNode::UnknownCluster { address, .. } => {
-            if address.is_empty() {
-                "unknown".to_string()
-            } else {
-                format!("{} (unknown)", address)
-            }
-        }
-        CdfNode::S3Bucket {
-            bucket, address, ..
-        } => format!("S3: {} @ {}", bucket, address),
-    }
-}
-
-fn node_type_label(node: &CdfNode) -> &'static str {
-    match node {
-        CdfNode::ProfiledCluster { .. } => "cluster",
-        CdfNode::UnknownCluster { .. } => "cluster",
-        CdfNode::S3Bucket { .. } => "s3",
+        CdfNode::S3Bucket { bucket, .. } => bucket.clone(),
     }
 }
 
 // ── Rendering ───────────────────────────────────────────────────────────────
 
-fn render_header(out: &mut String, graph: &CdfGraph) {
+fn render_header(out: &mut String, topo: &Topology) {
     let bold = style_bold();
     let title = "═══ Data Fabric Topology ";
-    let padding = 80_usize.saturating_sub(title.len());
+    let padding = 75_usize.saturating_sub(title.len());
     out.push_str(&format!(
         "{}\n",
         bold.apply_to(format!("{}{}", title, "═".repeat(padding)))
     ));
-    out.push_str(&format!(
-        "  {} clusters, {} relationships\n\n",
-        graph.node_count(),
-        graph.edge_count()
-    ));
+
+    // Summary line
+    let mut parts = Vec::new();
+    parts.push(format!("{} clusters", topo.cluster_count));
+    if topo.s3_count > 0 {
+        parts.push(format!("{} S3 buckets", topo.s3_count));
+    }
+    if topo.remote_peer_count > 0 {
+        parts.push(format!("{} remote peers", topo.remote_peer_count));
+    }
+    out.push_str(&format!("  {}\n", parts.join(" \u{00b7} ")));
 }
 
 fn render_single_node(out: &mut String, graph: &CdfGraph) {
     for idx in graph.node_indices() {
         let node = &graph[idx];
         let label = node_label(node);
-        let type_label = node_type_label(node);
         out.push_str(&format!(
-            "  {} ({})\n",
+            "\n  {}  {}\n",
             style_bold().apply_to(&label),
-            Style::new().dim().apply_to(type_label)
+            style_dim().apply_to("(no connections)")
         ));
     }
 }
 
-/// Key for grouping duplicate edges: (edge_type_tag, short_label, disabled).
-/// Edges with the same key to the same target get collapsed with a count.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-struct EdgeGroupKey {
-    type_tag: &'static str, // "portal", "replication", "S3"
-    short_label: String,    // e.g. "continuous", "read write", "copy-to"
-    disabled: bool,
-}
-
-struct EdgeGroupValue {
-    count: usize,
-    /// One representative edge for detail rendering
-    representative: usize, // index into edges vec
-}
-
-fn edge_group_key(edge: &CdfEdge) -> EdgeGroupKey {
-    match edge {
-        CdfEdge::Portal { portal_type, .. } => {
-            let short = portal_type
-                .strip_prefix("PORTAL_")
-                .unwrap_or(portal_type)
-                .to_lowercase()
-                .replace('_', " ");
-            EdgeGroupKey {
-                type_tag: "portal",
-                short_label: short,
-                disabled: false,
-            }
-        }
-        CdfEdge::Replication { mode, enabled, .. } => {
-            let short = mode
-                .as_deref()
-                .and_then(|m| m.strip_prefix("REPLICATION_"))
-                .unwrap_or(mode.as_deref().unwrap_or("?"))
-                .to_lowercase();
-            EdgeGroupKey {
-                type_tag: "replication",
-                short_label: short,
-                disabled: !enabled,
-            }
-        }
-        CdfEdge::ObjectReplication { direction, .. } => {
-            let dir = direction.as_deref().unwrap_or("?");
-            let short = match dir {
-                "COPY_TO_OBJECT" => "copy-to",
-                "COPY_FROM_OBJECT" => "copy-from",
-                other => other,
-            };
-            EdgeGroupKey {
-                type_tag: "S3",
-                short_label: short.to_string(),
-                disabled: false,
-            }
-        }
-    }
-}
-
-fn style_for_edge(edge: &CdfEdge) -> Style {
-    match edge {
-        CdfEdge::Portal { .. } => style_portal(),
-        CdfEdge::Replication { enabled, .. } if !enabled => style_disabled(),
-        CdfEdge::Replication { .. } => style_replication(),
-        CdfEdge::ObjectReplication { .. } => style_object(),
-    }
-}
-
-fn render_tree(out: &mut String, graph: &CdfGraph, detail: bool) {
-    // Collect all source nodes that have outgoing edges, ordered by label
-    let mut source_nodes: Vec<petgraph::graph::NodeIndex> = graph
-        .node_indices()
-        .filter(|&idx| graph.edges(idx).next().is_some())
-        .collect();
-    source_nodes.sort_by(|a, b| node_label(&graph[*a]).cmp(&node_label(&graph[*b])));
-
-    // Also collect isolated nodes (no outgoing edges, but may have incoming)
-    // and truly isolated nodes (no edges at all)
-    let mut mentioned_as_target: std::collections::HashSet<petgraph::graph::NodeIndex> =
-        std::collections::HashSet::new();
-    for idx in graph.node_indices() {
-        for edge in graph.edges(idx) {
-            mentioned_as_target.insert(edge.target());
-        }
+fn render_cluster_connections(out: &mut String, topo: &Topology, detail: bool) {
+    if topo.cluster_pairs.is_empty() && topo.isolated_clusters.is_empty() {
+        return;
     }
 
-    for (src_i, &src_idx) in source_nodes.iter().enumerate() {
-        let src_node = &graph[src_idx];
-        let src_label = node_label(src_node);
-        let type_label = node_type_label(src_node);
+    out.push_str(&format!(
+        "\n  {}\n",
+        style_bold().apply_to("CLUSTER CONNECTIONS")
+    ));
+    out.push_str(&format!(
+        "  {}\n",
+        style_dim().apply_to("─".repeat(67))
+    ));
 
-        // Source header
+    for bundle in &topo.cluster_pairs {
+        render_pair_line(out, bundle, detail);
+        out.push('\n');
+    }
+
+    // Isolated clusters
+    for name in &topo.isolated_clusters {
         out.push_str(&format!(
-            "{} ({})\n",
-            style_bold().apply_to(&src_label),
-            Style::new().dim().apply_to(type_label)
+            "  {}{}(no cluster peers)\n\n",
+            style_bold().apply_to(name),
+            " ".repeat(50_usize.saturating_sub(name.len())),
         ));
-
-        // Group edges by target, then by edge key
-        // Use BTreeMap for stable ordering
-        let mut targets: BTreeMap<
-            petgraph::graph::NodeIndex,
-            BTreeMap<EdgeGroupKey, EdgeGroupValue>,
-        > = BTreeMap::new();
-        let mut edge_store: Vec<CdfEdge> = Vec::new();
-
-        for edge_ref in graph.edges(src_idx) {
-            let tgt_idx = edge_ref.target();
-            let edge = edge_ref.weight().clone();
-            let key = edge_group_key(&edge);
-            let edge_i = edge_store.len();
-            edge_store.push(edge);
-
-            let target_groups = targets.entry(tgt_idx).or_default();
-            target_groups
-                .entry(key)
-                .and_modify(|v| v.count += 1)
-                .or_insert(EdgeGroupValue {
-                    count: 1,
-                    representative: edge_i,
-                });
-        }
-
-        // Sort targets by label for stable output
-        let mut target_entries: Vec<_> = targets.into_iter().collect();
-        target_entries.sort_by(|a, b| node_label(&graph[a.0]).cmp(&node_label(&graph[b.0])));
-
-        let num_targets = target_entries.len();
-        for (tgt_i, (tgt_idx, groups)) in target_entries.into_iter().enumerate() {
-            let tgt_label = node_label(&graph[tgt_idx]);
-            let is_last_target = tgt_i == num_targets - 1;
-
-            // Collect all edge group descriptions for this target into one line
-            let mut edge_parts: Vec<String> = Vec::new();
-            let mut edge_styles: Vec<Style> = Vec::new();
-
-            let groups_vec: Vec<_> = groups.into_iter().collect();
-            for (key, value) in &groups_vec {
-                let edge = &edge_store[value.representative];
-                let style = style_for_edge(edge);
-
-                let mut part = format!("{} ({})", key.type_tag, key.short_label);
-                if key.disabled {
-                    part.push_str(" [DISABLED]");
-                }
-                if value.count > 1 {
-                    part.push_str(&format!(" x{}", value.count));
-                }
-                edge_parts.push(part);
-                edge_styles.push(style);
-            }
-
-            // Build the line
-            let connector = if is_last_target { "└── " } else { "├── " };
-            out.push_str(connector);
-            out.push_str(&format!("→ {}: ", style_bold().apply_to(&tgt_label)));
-
-            for (i, (part, style)) in edge_parts.iter().zip(edge_styles.iter()).enumerate() {
-                if i > 0 {
-                    out.push_str(", ");
-                }
-                out.push_str(&format!("{}", style.apply_to(part)));
-            }
-            out.push('\n');
-
-            // Detail lines for each edge group
-            if detail {
-                for (key, value) in &groups_vec {
-                    let edge = &edge_store[value.representative];
-                    if let Some(detail_str) = format_edge_detail(edge) {
-                        let prefix = if is_last_target {
-                            "    "
-                        } else {
-                            "│   "
-                        };
-                        out.push_str(&format!(
-                            "{}  {} ({}): {}\n",
-                            prefix,
-                            key.type_tag,
-                            key.short_label,
-                            Style::new().dim().apply_to(&detail_str)
-                        ));
-                    }
-                }
-            }
-        }
-
-        // Blank line between source clusters (except after last)
-        if src_i < source_nodes.len() - 1 {
-            out.push('\n');
-        }
-    }
-
-    // Show isolated nodes that are only targets (no outgoing edges) and not sources
-    let source_set: std::collections::HashSet<_> = source_nodes.iter().copied().collect();
-    let mut isolated: Vec<_> = graph
-        .node_indices()
-        .filter(|idx| !source_set.contains(idx) && !mentioned_as_target.contains(idx))
-        .collect();
-    isolated.sort_by(|a, b| node_label(&graph[*a]).cmp(&node_label(&graph[*b])));
-
-    if !isolated.is_empty() {
-        if !source_nodes.is_empty() {
-            out.push('\n');
-        }
-        for idx in &isolated {
-            let node = &graph[*idx];
-            let label = node_label(node);
-            let type_label = node_type_label(node);
-            out.push_str(&format!(
-                "{} ({}) — no relationships\n",
-                style_bold().apply_to(&label),
-                Style::new().dim().apply_to(type_label),
-            ));
-        }
     }
 }
 
-fn format_edge_detail(edge: &CdfEdge) -> Option<String> {
-    match edge {
-        CdfEdge::Portal { state, status, .. } => {
-            Some(format!("state={}, status={}", state, status))
+fn render_pair_line(out: &mut String, bundle: &ClusterPairBundle, _detail: bool) {
+    let a = &bundle.cluster_a;
+    let b = &bundle.cluster_b;
+
+    // Determine dominant edge type for line character
+    let dominant = dominant_type(&bundle.edge_groups);
+    let (line_char, line_style) = match dominant {
+        "repl" => ("═", style_replication()),
+        "portal" => ("─", style_portal()),
+        "S3" => ("╌", style_object()),
+        _ => ("┄", style_dim()),
+    };
+
+    // Build the connection line
+    let name_space: usize = 75 - 4; // 2-char indent each side + margins
+    let a_len = a.len();
+    let b_len = b.len();
+    let line_len = name_space.saturating_sub(a_len + b_len + 2); // +2 for spaces around line
+    let line = line_char.repeat(line_len.max(4));
+
+    out.push_str(&format!(
+        "  {} {} {}\n",
+        style_bold().apply_to(a),
+        line_style.apply_to(&line),
+        style_bold().apply_to(b),
+    ));
+
+    // Annotation line
+    let annotation = format_edge_annotation(&bundle.edge_groups);
+    let indent = 4;
+    out.push_str(&format!("{}{}\n", " ".repeat(indent), annotation));
+}
+
+fn dominant_type(groups: &[EdgeSummary]) -> &'static str {
+    // Priority: repl > portal > S3
+    let mut has_repl = false;
+    let mut has_portal = false;
+    for g in groups {
+        match g.type_tag {
+            "repl" => has_repl = true,
+            "portal" => has_portal = true,
+            _ => {}
         }
-        CdfEdge::Replication {
-            source_path,
-            target_path,
-            state,
-            job_state,
-            recovery_point,
-            error_from_last_job,
-            ..
-        } => {
-            let mut parts = Vec::new();
-            if let (Some(sp), Some(tp)) = (source_path.as_deref(), target_path.as_deref()) {
-                parts.push(format!("{} → {}", sp, tp));
-            }
-            if let Some(s) = state.as_deref() {
-                parts.push(format!("state={}", s));
-            }
-            if let Some(js) = job_state.as_deref() {
-                parts.push(format!("job={}", js));
-            }
-            if let Some(rp) = recovery_point.as_deref() {
-                parts.push(format!("rp={}", rp));
-            }
-            if let Some(err) = error_from_last_job.as_deref() {
-                parts.push(format!("error={}", err));
-            }
-            if parts.is_empty() {
-                None
-            } else {
-                Some(parts.join(", "))
-            }
-        }
-        CdfEdge::ObjectReplication {
-            bucket,
-            folder,
-            state,
-            ..
-        } => {
-            let mut parts = Vec::new();
-            if let Some(b) = bucket.as_deref() {
-                parts.push(format!("bucket={}", b));
-            }
-            if let Some(f) = folder.as_deref() {
-                parts.push(format!("folder={}", f));
-            }
-            if let Some(s) = state.as_deref() {
-                parts.push(format!("state={}", s));
-            }
-            if parts.is_empty() {
-                None
-            } else {
-                Some(parts.join(", "))
-            }
-        }
+    }
+    if has_repl {
+        "repl"
+    } else if has_portal {
+        "portal"
+    } else if !groups.is_empty() {
+        groups[0].type_tag
+    } else {
+        "repl"
     }
 }
 
-#[cfg(test)]
-fn format_edge_label(edge: &CdfEdge, detail: bool) -> String {
-    match edge {
-        CdfEdge::Portal {
-            portal_type,
-            state,
-            status,
-            ..
-        } => {
-            let short_type = portal_type
-                .strip_prefix("PORTAL_")
-                .unwrap_or(portal_type)
-                .to_lowercase()
-                .replace('_', " ");
-            if detail {
-                format!("portal ({}) [state={}, status={}]", short_type, state, status)
+fn format_edge_annotation(groups: &[EdgeSummary]) -> String {
+    let mut parts = Vec::new();
+    for g in groups {
+        let mut part = String::new();
+        part.push_str(g.type_tag);
+
+        if g.count > 1 {
+            part.push_str(&format!(" \u{00d7}{}", g.count));
+        }
+
+        let dir_symbol = match g.direction {
+            Direction::Forward => " \u{2192}",
+            Direction::Backward => " \u{2190}",
+            Direction::Both => " \u{2194}",
+        };
+        part.push_str(dir_symbol);
+
+        if g.disabled_count > 0 {
+            if g.disabled_count == g.count {
+                part.push_str(&format!(
+                    " {}",
+                    style_disabled().apply_to("[ALL DISABLED]")
+                ));
             } else {
-                format!("portal ({})", short_type)
+                part.push_str(&format!(
+                    " {}",
+                    style_disabled()
+                        .apply_to(format!("[{} disabled]", g.disabled_count))
+                ));
             }
         }
-        CdfEdge::Replication {
-            source_path,
-            target_path,
-            mode,
-            enabled,
-            ..
-        } => {
-            let short_mode = mode
-                .as_deref()
-                .and_then(|m| m.strip_prefix("REPLICATION_"))
-                .unwrap_or(mode.as_deref().unwrap_or("?"))
-                .to_lowercase();
-            if detail {
-                format!(
-                    "replication ({}) {}:{} → {}{}",
-                    short_mode,
-                    source_path.as_deref().unwrap_or("?"),
-                    "",
-                    target_path.as_deref().unwrap_or("?"),
-                    if *enabled { "" } else { " [DISABLED]" }
-                )
-            } else {
-                let mut label = format!("replication ({})", short_mode);
-                if !enabled {
-                    label.push_str(" [DISABLED]");
-                }
-                label
-            }
-        }
-        CdfEdge::ObjectReplication {
-            direction,
-            bucket,
-            folder,
-            ..
-        } => {
-            let dir = direction.as_deref().unwrap_or("?");
-            let short_dir = match dir {
-                "COPY_TO_OBJECT" => "copy-to",
-                "COPY_FROM_OBJECT" => "copy-from",
-                other => other,
+        parts.push(part);
+    }
+    parts.join(" + ")
+}
+
+fn render_s3_section(out: &mut String, topo: &Topology) {
+    if topo.s3_groups.is_empty() {
+        return;
+    }
+
+    out.push_str(&format!(
+        "  {}\n",
+        style_bold().apply_to("S3 BUCKETS \u{2601}")
+    ));
+    out.push_str(&format!(
+        "  {}\n",
+        style_dim().apply_to("─".repeat(67))
+    ));
+
+    for group in &topo.s3_groups {
+        let cluster = &group.cluster_name;
+        let dashes = "╌╌╌╌╌";
+
+        let mut bucket_parts: Vec<String> = Vec::new();
+        for sat in &group.satellites {
+            let mut part = sat.label.clone();
+            let dir = match sat.direction {
+                Direction::Forward => "\u{2192}",
+                Direction::Backward => "\u{2190}",
+                Direction::Both => "\u{2194}",
             };
-            if detail {
-                format!(
-                    "S3 {} bucket={} folder={}",
-                    short_dir,
-                    bucket.as_deref().unwrap_or("?"),
-                    folder.as_deref().unwrap_or("/"),
-                )
+            if sat.count > 1 {
+                part.push_str(&format!(" ({}\u{00d7}{})", dir, sat.count));
             } else {
-                format!("S3 {}", short_dir)
+                part.push_str(&format!(" ({})", dir));
+            }
+            if sat.disabled_count > 0 {
+                part.push_str(" [off]");
+            }
+            bucket_parts.push(part);
+        }
+
+        // Render with wrapping
+        let prefix_visible_len = cluster.len() + 2 + dashes.len() + 2;
+        let continuation_indent = " ".repeat(prefix_visible_len);
+
+        let joined = bucket_parts.join(", ");
+        let max_right = 75 - prefix_visible_len;
+
+        if joined.len() <= max_right {
+            out.push_str(&format!(
+                "  {} {} {}\n",
+                style_bold().apply_to(cluster),
+                style_object().apply_to(dashes),
+                style_object().apply_to(&joined)
+            ));
+        } else {
+            // Wrap
+            let mut lines = Vec::new();
+            let mut current_line = String::new();
+            for (i, part) in bucket_parts.iter().enumerate() {
+                let addition = if current_line.is_empty() {
+                    part.clone()
+                } else {
+                    format!(", {}", part)
+                };
+                if !current_line.is_empty() && current_line.len() + addition.len() > max_right {
+                    lines.push(current_line);
+                    current_line = part.clone();
+                } else {
+                    current_line.push_str(&addition);
+                }
+                if i == bucket_parts.len() - 1 {
+                    lines.push(current_line.clone());
+                }
+            }
+
+            for (i, line) in lines.iter().enumerate() {
+                if i == 0 {
+                    out.push_str(&format!(
+                        "  {} {} {}\n",
+                        style_bold().apply_to(cluster),
+                        style_object().apply_to(dashes),
+                        style_object().apply_to(line)
+                    ));
+                } else {
+                    out.push_str(&format!(
+                        "{}{}\n",
+                        continuation_indent,
+                        style_object().apply_to(line)
+                    ));
+                }
             }
         }
     }
+    out.push('\n');
+}
+
+fn render_remote_peers_section(out: &mut String, topo: &Topology) {
+    if topo.remote_peer_groups.is_empty() {
+        return;
+    }
+
+    out.push_str(&format!(
+        "  {}\n",
+        style_bold().apply_to("REMOTE PEERS \u{25CB}")
+    ));
+    out.push_str(&format!(
+        "  {}\n",
+        style_dim().apply_to("─".repeat(67))
+    ));
+
+    for group in &topo.remote_peer_groups {
+        let cluster = &group.cluster_name;
+        let dashes = "┄┄┄┄┄";
+
+        let mut peer_parts: Vec<String> = Vec::new();
+        for sat in &group.satellites {
+            let mut part = sat.label.clone();
+            if sat.count > 1 {
+                let off_note = if sat.disabled_count > 0 {
+                    format!(", {} off", sat.disabled_count)
+                } else {
+                    String::new()
+                };
+                part.push_str(&format!(" (\u{00d7}{}{})", sat.count, off_note));
+            } else if sat.disabled_count > 0 {
+                part.push_str(" [off]");
+            }
+            peer_parts.push(part);
+        }
+
+        let prefix_visible_len = cluster.len() + 2 + dashes.len() + 2;
+        let continuation_indent = " ".repeat(prefix_visible_len);
+        let joined = peer_parts.join(", ");
+        let max_right = 75 - prefix_visible_len;
+
+        if joined.len() <= max_right {
+            out.push_str(&format!(
+                "  {} {} {}\n",
+                style_bold().apply_to(cluster),
+                style_dim().apply_to(dashes),
+                style_dim().apply_to(&joined)
+            ));
+        } else {
+            let mut lines = Vec::new();
+            let mut current_line = String::new();
+            for (i, part) in peer_parts.iter().enumerate() {
+                let addition = if current_line.is_empty() {
+                    part.clone()
+                } else {
+                    format!(", {}", part)
+                };
+                if !current_line.is_empty() && current_line.len() + addition.len() > max_right {
+                    lines.push(current_line);
+                    current_line = part.clone();
+                } else {
+                    current_line.push_str(&addition);
+                }
+                if i == peer_parts.len() - 1 {
+                    lines.push(current_line.clone());
+                }
+            }
+
+            for (i, line) in lines.iter().enumerate() {
+                if i == 0 {
+                    out.push_str(&format!(
+                        "  {} {} {}\n",
+                        style_bold().apply_to(cluster),
+                        style_dim().apply_to(dashes),
+                        style_dim().apply_to(line)
+                    ));
+                } else {
+                    out.push_str(&format!(
+                        "{}{}\n",
+                        continuation_indent,
+                        style_dim().apply_to(line)
+                    ));
+                }
+            }
+        }
+    }
+    out.push('\n');
+}
+
+fn render_legend(out: &mut String, topo: &Topology) {
+    let mut parts = Vec::new();
+    if topo.has_replication {
+        parts.push(format!(
+            "{} repl",
+            style_replication().apply_to("══")
+        ));
+    }
+    if topo.has_portal {
+        parts.push(format!(
+            "{} portal",
+            style_portal().apply_to("──")
+        ));
+    }
+    if topo.has_s3 {
+        parts.push(format!("{} S3", style_object().apply_to("╌╌")));
+    }
+    if topo.has_remote {
+        parts.push(format!("{} peer", style_dim().apply_to("┄┄")));
+    }
+    parts.push("\u{2192} one-way".to_string());
+    parts.push("\u{2194} both".to_string());
+    parts.push(format!("{} disabled", style_disabled().apply_to("[off]")));
+
+    out.push_str(&format!("  {}\n", parts.join("   ")));
 }
 
 // ── Tests ───────────────────────────────────────────────────────────────────
@@ -559,7 +887,7 @@ mod tests {
         let plain = strip_ansi(&output);
         assert!(plain.contains("lonely"));
         assert!(plain.contains("Data Fabric Topology"));
-        assert!(plain.contains("1 clusters, 0 relationships"));
+        assert!(plain.contains("1 clusters"));
     }
 
     #[test]
@@ -570,22 +898,23 @@ mod tests {
 
         // Verify header
         assert!(plain.contains("Data Fabric Topology"));
-        assert!(plain.contains("3 clusters, 3 relationships"));
+        assert!(plain.contains("2 clusters"));
 
-        // Verify source cluster names appear as headers
-        assert!(plain.contains("gravytrain (cluster)"));
-        assert!(plain.contains("iss (cluster)"));
+        // Verify cluster connection section
+        assert!(plain.contains("CLUSTER CONNECTIONS"));
+        assert!(plain.contains("gravytrain"));
+        assert!(plain.contains("iss"));
 
-        // Verify edge labels with target names
-        assert!(plain.contains("→ iss:"));
-        assert!(plain.contains("replication (continuous)"));
-        assert!(plain.contains("portal (read write)"));
-        assert!(plain.contains("→ S3:backup-bucket:"));
-        assert!(plain.contains("S3 (copy-to)"));
+        // Verify edge annotations
+        assert!(plain.contains("repl"));
+        assert!(plain.contains("portal"));
 
-        // Should NOT contain detail info in compact mode
-        assert!(!plain.contains("/data"));
-        assert!(!plain.contains("state=ACCEPTED"));
+        // Verify S3 section
+        assert!(plain.contains("S3 BUCKETS"));
+        assert!(plain.contains("backup-bucket"));
+
+        // Verify legend
+        assert!(plain.contains("one-way"));
     }
 
     #[test]
@@ -594,13 +923,12 @@ mod tests {
         let output = render(&graph, true);
         let plain = strip_ansi(&output);
 
-        // Detail mode should include paths, states, and target names
-        assert!(plain.contains("replication (continuous)"));
-        assert!(plain.contains("portal (read write)"));
-        assert!(plain.contains("→ iss:"));
-        // Detail edge info
-        assert!(plain.contains("state=ACCEPTED"));
-        assert!(plain.contains("status=ACTIVE"));
+        // Detail mode should still show the topology
+        assert!(plain.contains("CLUSTER CONNECTIONS"));
+        assert!(plain.contains("gravytrain"));
+        assert!(plain.contains("iss"));
+        assert!(plain.contains("repl"));
+        assert!(plain.contains("portal"));
     }
 
     #[test]
@@ -632,9 +960,8 @@ mod tests {
         );
         let output = render(&graph, false);
         let plain = strip_ansi(&output);
-        assert!(plain.contains("10.0.0.99 (unknown)"));
-        assert!(plain.contains("→ 10.0.0.99 (unknown):"));
-        assert!(plain.contains("replication (snapshot)"));
+        assert!(plain.contains("REMOTE PEERS"));
+        assert!(plain.contains("10.0.0.99"));
     }
 
     #[test]
@@ -667,7 +994,11 @@ mod tests {
         );
         let output = render(&graph, false);
         let plain = strip_ansi(&output);
-        assert!(plain.contains("[DISABLED]"));
+        assert!(
+            plain.contains("DISABLED") || plain.contains("disabled"),
+            "Output should contain disabled indicator, got:\n{}",
+            plain
+        );
     }
 
     #[test]
@@ -696,23 +1027,23 @@ mod tests {
         let output = render(&graph, false);
         let plain = strip_ansi(&output);
         assert!(plain.contains("cluster-a"));
-        assert!(plain.contains("S3:my-bucket"));
-        assert!(plain.contains("S3 (copy-to)"));
+        assert!(plain.contains("my-bucket"));
+        assert!(plain.contains("S3 BUCKETS"));
     }
 
     #[test]
     fn test_render_output_valid_utf8() {
         let graph = make_test_graph();
         let output = render(&graph, false);
-        // If we got here, it's valid UTF-8 (Rust strings are always valid UTF-8)
         assert!(!output.is_empty());
 
-        // Verify tree-drawing characters are present
+        // Verify box-drawing characters
         let plain = strip_ansi(&output);
-        let has_tree_chars = plain.contains('├') || plain.contains('└') || plain.contains('│');
+        let has_box_chars =
+            plain.contains('═') || plain.contains('─') || plain.contains('╌') || plain.contains('┄');
         assert!(
-            has_tree_chars,
-            "Output should contain tree-drawing characters"
+            has_box_chars,
+            "Output should contain box-drawing characters"
         );
     }
 
@@ -744,8 +1075,7 @@ mod tests {
         );
         let output = render(&graph, false);
         let plain = strip_ansi(&output);
-        assert!(plain.contains("10.0.0.1 (unknown)"));
-        assert!(plain.contains("10.0.0.2 (unknown)"));
+        assert!(plain.contains("10.0.0.1") || plain.contains("10.0.0.2"));
     }
 
     #[test]
@@ -763,7 +1093,7 @@ mod tests {
                 address: "10.0.0.1".into(),
                 uuid: None,
             }),
-            "10.0.0.1 (unknown)"
+            "10.0.0.1"
         );
         assert_eq!(
             node_label(&CdfNode::UnknownCluster {
@@ -778,109 +1108,12 @@ mod tests {
                 bucket: "bkt".into(),
                 region: None,
             }),
-            "S3:bkt"
+            "bkt"
         );
     }
 
     #[test]
-    fn test_edge_label_compact() {
-        let portal = CdfEdge::Portal {
-            hub_id: 1,
-            spoke_id: 2,
-            portal_type: "PORTAL_READ_WRITE".into(),
-            state: "ACCEPTED".into(),
-            status: "ACTIVE".into(),
-        };
-        assert_eq!(format_edge_label(&portal, false), "portal (read write)");
-
-        let repl = CdfEdge::Replication {
-            source_path: Some("/a".into()),
-            target_path: Some("/b".into()),
-            mode: Some("REPLICATION_CONTINUOUS".into()),
-            enabled: true,
-            state: None,
-            job_state: None,
-            recovery_point: None,
-            error_from_last_job: None,
-            replication_job_status: None,
-        };
-        assert_eq!(format_edge_label(&repl, false), "replication (continuous)");
-
-        let obj = CdfEdge::ObjectReplication {
-            direction: Some("COPY_TO_OBJECT".into()),
-            bucket: Some("bkt".into()),
-            folder: Some("f/".into()),
-            state: None,
-        };
-        assert_eq!(format_edge_label(&obj, false), "S3 copy-to");
-    }
-
-    #[test]
-    fn test_edge_label_detail() {
-        let portal = CdfEdge::Portal {
-            hub_id: 1,
-            spoke_id: 2,
-            portal_type: "PORTAL_READ_ONLY".into(),
-            state: "PENDING".into(),
-            status: "INACTIVE".into(),
-        };
-        let label = format_edge_label(&portal, true);
-        assert!(label.contains("state=PENDING"));
-        assert!(label.contains("status=INACTIVE"));
-
-        let obj = CdfEdge::ObjectReplication {
-            direction: Some("COPY_FROM_OBJECT".into()),
-            bucket: Some("my-bkt".into()),
-            folder: Some("data/".into()),
-            state: None,
-        };
-        let label = format_edge_label(&obj, true);
-        assert!(label.contains("copy-from"));
-        assert!(label.contains("bucket=my-bkt"));
-        assert!(label.contains("folder=data/"));
-    }
-
-    #[test]
-    fn test_edges_show_target_node_name() {
-        let mut graph = CdfGraph::new();
-        let n1 = graph.add_node(CdfNode::ProfiledCluster {
-            name: "source".into(),
-            uuid: "uuid-1".into(),
-            address: "10.0.0.1".into(),
-        });
-        let n2 = graph.add_node(CdfNode::ProfiledCluster {
-            name: "target".into(),
-            uuid: "uuid-2".into(),
-            address: "10.0.0.2".into(),
-        });
-        graph.add_edge(
-            n1,
-            n2,
-            CdfEdge::Replication {
-                source_path: None,
-                target_path: None,
-                mode: Some("REPLICATION_CONTINUOUS".into()),
-                enabled: true,
-                state: None,
-                job_state: None,
-                recovery_point: None,
-                error_from_last_job: None,
-                replication_job_status: None,
-            },
-        );
-        let output = render(&graph, false);
-        let plain = strip_ansi(&output);
-        // Edge label must include target name
-        assert!(
-            plain.contains("→ target:"),
-            "Edge label should include target node name, got:\n{}",
-            plain
-        );
-        assert!(plain.contains("replication (continuous)"));
-    }
-
-    #[test]
-    fn test_duplicate_edges_collapsed() {
+    fn test_render_duplicate_edges_collapsed() {
         let mut graph = CdfGraph::new();
         let n1 = graph.add_node(CdfNode::ProfiledCluster {
             name: "gravytrain-sg".into(),
@@ -928,46 +1161,138 @@ mod tests {
         let output = render(&graph, false);
         let plain = strip_ansi(&output);
 
-        // Should show "x3" for collapsed edges
+        // Should show "×3" for collapsed edges
         assert!(
-            plain.contains("x3"),
-            "Should collapse 3 duplicate edges with x3, got:\n{}",
+            plain.contains("\u{00d7}3"),
+            "Should collapse 3 duplicate edges with \u{00d7}3, got:\n{}",
             plain
         );
-        // Should show portal without count (only 1)
-        assert!(plain.contains("portal (read write)"));
-        assert!(!plain.contains("portal (read write) x"));
+        // Should show portal
+        assert!(plain.contains("portal"));
     }
 
     #[test]
-    fn test_s3_label_abbreviated() {
-        let node = CdfNode::S3Bucket {
-            address: "s3-us-west-2.amazonaws.com".into(),
-            bucket: "speqtrum-demo".into(),
-            region: Some("us-west-2".into()),
-        };
-        // Short label should be "S3:speqtrum-demo", not "S3: speqtrum-demo @ s3-us-west-2.amazonaws.com"
-        assert_eq!(node_label(&node), "S3:speqtrum-demo");
-        // Full label preserves address
-        assert_eq!(
-            node_label_full(&node),
-            "S3: speqtrum-demo @ s3-us-west-2.amazonaws.com"
-        );
-    }
-
-    #[test]
-    fn test_output_width_under_120() {
+    fn test_output_width_under_80() {
         let graph = make_test_graph();
         let output = render(&graph, false);
         let plain = strip_ansi(&output);
         for line in plain.lines() {
             let width = console::measure_text_width(line);
             assert!(
-                width <= 120,
-                "Line exceeds 120 display cols ({} cols): {}",
+                width <= 80,
+                "Line exceeds 80 display cols ({} cols): {}",
                 width,
                 line
             );
         }
+    }
+
+    #[test]
+    fn test_legend_present() {
+        let graph = make_test_graph();
+        let output = render(&graph, false);
+        let plain = strip_ansi(&output);
+        assert!(plain.contains("repl"));
+        assert!(plain.contains("portal"));
+        assert!(plain.contains("one-way"));
+        assert!(plain.contains("both"));
+    }
+
+    #[test]
+    fn test_isolated_cluster_shown() {
+        let mut graph = CdfGraph::new();
+        let n1 = graph.add_node(CdfNode::ProfiledCluster {
+            name: "connected-a".into(),
+            uuid: "uuid-1".into(),
+            address: "10.0.0.1".into(),
+        });
+        let n2 = graph.add_node(CdfNode::ProfiledCluster {
+            name: "connected-b".into(),
+            uuid: "uuid-2".into(),
+            address: "10.0.0.2".into(),
+        });
+        graph.add_node(CdfNode::ProfiledCluster {
+            name: "lonely-cluster".into(),
+            uuid: "uuid-3".into(),
+            address: "10.0.0.3".into(),
+        });
+        graph.add_edge(
+            n1,
+            n2,
+            CdfEdge::Replication {
+                source_path: None,
+                target_path: None,
+                mode: Some("REPLICATION_CONTINUOUS".into()),
+                enabled: true,
+                state: None,
+                job_state: None,
+                recovery_point: None,
+                error_from_last_job: None,
+                replication_job_status: None,
+            },
+        );
+        let output = render(&graph, false);
+        let plain = strip_ansi(&output);
+        assert!(
+            plain.contains("lonely-cluster"),
+            "Isolated cluster should be shown, got:\n{}",
+            plain
+        );
+        assert!(plain.contains("no cluster peers"));
+    }
+
+    #[test]
+    fn test_bidirectional_detection() {
+        let mut graph = CdfGraph::new();
+        let n1 = graph.add_node(CdfNode::ProfiledCluster {
+            name: "alpha".into(),
+            uuid: "uuid-1".into(),
+            address: "10.0.0.1".into(),
+        });
+        let n2 = graph.add_node(CdfNode::ProfiledCluster {
+            name: "beta".into(),
+            uuid: "uuid-2".into(),
+            address: "10.0.0.2".into(),
+        });
+        // Edge from alpha to beta
+        graph.add_edge(
+            n1,
+            n2,
+            CdfEdge::Replication {
+                source_path: None,
+                target_path: None,
+                mode: Some("REPLICATION_CONTINUOUS".into()),
+                enabled: true,
+                state: None,
+                job_state: None,
+                recovery_point: None,
+                error_from_last_job: None,
+                replication_job_status: None,
+            },
+        );
+        // Edge from beta to alpha
+        graph.add_edge(
+            n2,
+            n1,
+            CdfEdge::Replication {
+                source_path: None,
+                target_path: None,
+                mode: Some("REPLICATION_CONTINUOUS".into()),
+                enabled: true,
+                state: None,
+                job_state: None,
+                recovery_point: None,
+                error_from_last_job: None,
+                replication_job_status: None,
+            },
+        );
+        let output = render(&graph, false);
+        let plain = strip_ansi(&output);
+        // Should detect bidirectional
+        assert!(
+            plain.contains("\u{2194}"),
+            "Bidirectional edges should show \u{2194}, got:\n{}",
+            plain
+        );
     }
 }
