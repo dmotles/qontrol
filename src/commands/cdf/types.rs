@@ -276,6 +276,7 @@ pub enum CdfEdge {
         portal_type: String,
         state: String,
         status: String,
+        roots: Vec<String>,
     },
     Replication {
         source_path: Option<String>,
@@ -585,6 +586,7 @@ mod tests {
                 portal_type: "PORTAL_READ_WRITE".into(),
                 state: "ACCEPTED".into(),
                 status: "ACTIVE".into(),
+                roots: vec!["/data".into()],
             },
         );
         graph.add_edge(

@@ -848,6 +848,7 @@ mod tests {
                 portal_type: "PORTAL_READ_WRITE".into(),
                 state: "ACCEPTED".into(),
                 status: "ACTIVE".into(),
+                roots: vec!["/data".into()],
             },
         );
         graph.add_edge(
@@ -1141,6 +1142,7 @@ mod tests {
                 portal_type: "PORTAL_READ_WRITE".into(),
                 state: "ACCEPTED".into(),
                 status: "ACTIVE".into(),
+                roots: vec!["/data".into()],
             },
         );
 

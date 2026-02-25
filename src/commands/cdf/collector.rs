@@ -321,6 +321,7 @@ pub fn build_cdf_graph(clusters: &[ClusterCdfData], cluster_filter: Option<&str>
                             portal_type: hub.portal_type.clone(),
                             state: hub.state.clone(),
                             status: hub.status.clone(),
+                            roots: hub.authorized_roots.clone(),
                         },
                     );
                     portal_edges.insert(key, true);
@@ -350,6 +351,11 @@ pub fn build_cdf_graph(clusters: &[ClusterCdfData], cluster_filter: Option<&str>
                     // Hub side didn't add this; try finding the hub's ID
                     let hub_id = find_matching_hub(clusters, cluster, spoke);
                     // Edge direction: hub → spoke
+                    let roots: Vec<String> = spoke
+                        .roots
+                        .iter()
+                        .map(|r| r.local_root.clone())
+                        .collect();
                     graph.add_edge(
                         hub_node,
                         source_node,
@@ -359,6 +365,7 @@ pub fn build_cdf_graph(clusters: &[ClusterCdfData], cluster_filter: Option<&str>
                             portal_type: spoke.portal_type.clone(),
                             state: spoke.state.clone(),
                             status: spoke.status.clone(),
+                            roots,
                         },
                     );
                     portal_edges.insert(key, true);
@@ -895,6 +902,7 @@ pub fn graph_to_json(graph: &CdfGraph) -> serde_json::Value {
                     portal_type,
                     state,
                     status,
+                    roots,
                 } => serde_json::json!({
                     "source": src,
                     "target": tgt,
@@ -904,6 +912,7 @@ pub fn graph_to_json(graph: &CdfGraph) -> serde_json::Value {
                     "portal_type": portal_type,
                     "state": state,
                     "status": status,
+                    "roots": roots,
                 }),
                 CdfEdge::Replication {
                     source_path,
