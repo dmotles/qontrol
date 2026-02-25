@@ -86,7 +86,7 @@ fn render_cluster_heading(out: &mut String, node: &CdfNode) {
 fn render_column_headers(out: &mut String) {
     let dim = Style::new().dim();
     out.push_str(&format!(
-        "  {:<24} {:<14} {:<14} {:<14} {:<14} {}\n",
+        "  {:<24} {:<8} {:<14} {:<14} {:<14} {}\n",
         dim.apply_to("TARGET"),
         dim.apply_to("TYPE"),
         dim.apply_to("MODE"),
@@ -104,7 +104,7 @@ fn render_edge_row(out: &mut String, target: &CdfNode, edge: &CdfEdge, detail: b
     let status_style = status_color(&status);
 
     out.push_str(&format!(
-        "  {:<24} {:<14} {:<14} {} {:<14} {}\n",
+        "  {:<24} {:<8} {:<14} {} {:<14} {}\n",
         style.apply_to(truncate(&target_name, 24)),
         style.apply_to(&edge_type),
         mode,
@@ -144,11 +144,13 @@ fn extract_edge_fields(edge: &CdfEdge, detail: bool) -> (String, String, String,
             replication_job_status,
             ..
         } => {
-            let short_mode = mode
-                .as_deref()
-                .and_then(|m| m.strip_prefix("REPLICATION_"))
-                .unwrap_or(mode.as_deref().unwrap_or("?"))
-                .to_lowercase();
+            let short_mode = shorten_mode(
+                &mode
+                    .as_deref()
+                    .and_then(|m| m.strip_prefix("REPLICATION_"))
+                    .unwrap_or(mode.as_deref().unwrap_or("?"))
+                    .to_lowercase(),
+            );
 
             let status = if !enabled {
                 "disabled".into()
@@ -159,7 +161,7 @@ fn extract_edge_fields(edge: &CdfEdge, detail: bool) -> (String, String, String,
             let lag = format_recovery_lag(recovery_point.as_deref());
             let throughput = format_throughput(replication_job_status.as_ref());
 
-            ("replication".into(), short_mode, status, lag, throughput)
+            ("repl".into(), short_mode, status, lag, throughput)
         }
         CdfEdge::ObjectReplication {
             direction,
@@ -172,7 +174,9 @@ fn extract_edge_fields(edge: &CdfEdge, detail: bool) -> (String, String, String,
                 "COPY_FROM_OBJECT" => "copy-from",
                 other => other,
             };
-            let status = state.as_deref().unwrap_or("?").to_lowercase();
+            let status = shorten_status(
+                &state.as_deref().unwrap_or("?").to_lowercase(),
+            );
             (
                 "S3".into(),
                 short_dir.into(),
@@ -182,6 +186,21 @@ fn extract_edge_fields(edge: &CdfEdge, detail: bool) -> (String, String, String,
             )
         }
     }
+}
+
+fn shorten_mode(mode: &str) -> String {
+    match mode {
+        "snapshot_policy_with_continuous" => "snap+cont".into(),
+        "snapshot_policy" => "snapshot".into(),
+        other => other.into(),
+    }
+}
+
+fn shorten_status(status: &str) -> String {
+    status
+        .strip_prefix("replication_")
+        .unwrap_or(status)
+        .replace('_', " ")
 }
 
 fn format_replication_status(state: Option<&str>, job_state: Option<&str>) -> String {
@@ -422,7 +441,7 @@ mod tests {
         let graph = make_test_graph();
         let output = render_table(&graph, false);
         // Check replication row
-        assert!(output.contains("replication"));
+        assert!(output.contains("repl"));
         assert!(output.contains("continuous"));
         assert!(output.contains("running"));
         // Check portal row
