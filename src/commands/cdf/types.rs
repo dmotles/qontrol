@@ -93,36 +93,93 @@ pub struct JobDuration {
 }
 
 /// Detailed replication job progress.
+///
+/// Note: The Qumulo API returns some fields (like `percent_complete`) as JSON
+/// numbers while others come as strings. We use a custom deserializer on all
+/// numeric-like fields so that both `"75.5"` (string) and `75.5` (number) parse
+/// into `Option<String>`.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ReplicationJobStatus {
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_string_or_number")]
     pub percent_complete: Option<String>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_string_or_number")]
     pub estimated_seconds_remaining: Option<String>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_string_or_number")]
     pub bytes_transferred: Option<String>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_string_or_number")]
     pub bytes_unchanged: Option<String>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_string_or_number")]
     pub bytes_remaining: Option<String>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_string_or_number")]
     pub bytes_deleted: Option<String>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_string_or_number")]
     pub bytes_total: Option<String>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_string_or_number")]
     pub files_transferred: Option<String>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_string_or_number")]
     pub files_unchanged: Option<String>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_string_or_number")]
     pub files_remaining: Option<String>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_string_or_number")]
     pub files_deleted: Option<String>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_string_or_number")]
     pub files_total: Option<String>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_string_or_number")]
     pub throughput_overall: Option<String>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_string_or_number")]
     pub throughput_current: Option<String>,
+}
+
+/// Deserialize a JSON value that may be either a string or a number into `Option<String>`.
+///
+/// The Qumulo replication API is inconsistent: some numeric fields are returned as
+/// JSON strings (e.g., `"131072000"`) while others are JSON numbers (e.g., `75.5`).
+/// This handles both representations.
+fn deserialize_string_or_number<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::de;
+
+    struct StringOrNumber;
+
+    impl<'de> de::Visitor<'de> for StringOrNumber {
+        type Value = Option<String>;
+
+        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+            formatter.write_str("a string, number, or null")
+        }
+
+        fn visit_none<E: de::Error>(self) -> Result<Self::Value, E> {
+            Ok(None)
+        }
+
+        fn visit_unit<E: de::Error>(self) -> Result<Self::Value, E> {
+            Ok(None)
+        }
+
+        fn visit_str<E: de::Error>(self, v: &str) -> Result<Self::Value, E> {
+            Ok(Some(v.to_string()))
+        }
+
+        fn visit_string<E: de::Error>(self, v: String) -> Result<Self::Value, E> {
+            Ok(Some(v))
+        }
+
+        fn visit_i64<E: de::Error>(self, v: i64) -> Result<Self::Value, E> {
+            Ok(Some(v.to_string()))
+        }
+
+        fn visit_u64<E: de::Error>(self, v: u64) -> Result<Self::Value, E> {
+            Ok(Some(v.to_string()))
+        }
+
+        fn visit_f64<E: de::Error>(self, v: f64) -> Result<Self::Value, E> {
+            Ok(Some(v.to_string()))
+        }
+    }
+
+    deserializer.deserialize_any(StringOrNumber)
 }
 
 /// Status for a source replication relationship.
@@ -615,5 +672,90 @@ mod tests {
 
         assert_eq!(graph.node_count(), 3);
         assert_eq!(graph.edge_count(), 3);
+    }
+
+    #[test]
+    fn test_job_status_with_numeric_percent_complete() {
+        // The API returns percent_complete as a number, not a string
+        let data = json!({
+            "percent_complete": 75.5,
+            "bytes_transferred": "1024000",
+            "bytes_total": "2048000",
+            "throughput_current": "131072000"
+        });
+        let status: ReplicationJobStatus = serde_json::from_value(data).unwrap();
+        assert_eq!(status.percent_complete.as_deref(), Some("75.5"));
+        assert_eq!(status.throughput_current.as_deref(), Some("131072000"));
+    }
+
+    #[test]
+    fn test_job_status_with_string_percent_complete() {
+        // Some API versions may return percent_complete as a string
+        let data = json!({
+            "percent_complete": "50.0",
+            "throughput_current": "65536000"
+        });
+        let status: ReplicationJobStatus = serde_json::from_value(data).unwrap();
+        assert_eq!(status.percent_complete.as_deref(), Some("50.0"));
+        assert_eq!(status.throughput_current.as_deref(), Some("65536000"));
+    }
+
+    #[test]
+    fn test_job_status_with_null_fields() {
+        let data = json!({
+            "percent_complete": null,
+            "throughput_current": null
+        });
+        let status: ReplicationJobStatus = serde_json::from_value(data).unwrap();
+        assert!(status.percent_complete.is_none());
+        assert!(status.throughput_current.is_none());
+    }
+
+    #[test]
+    fn test_job_status_empty_object() {
+        let data = json!({});
+        let status: ReplicationJobStatus = serde_json::from_value(data).unwrap();
+        assert!(status.percent_complete.is_none());
+        assert!(status.throughput_current.is_none());
+        assert!(status.throughput_overall.is_none());
+    }
+
+    #[test]
+    fn test_source_status_with_numeric_job_status() {
+        // Full source status where the API returns numeric fields in job_status
+        let data = json!([{
+            "id": "test-id",
+            "state": "ESTABLISHED",
+            "job_state": "REPLICATION_RUNNING",
+            "replication_enabled": true,
+            "recovery_point": "2026-02-23T12:00:00Z",
+            "replication_job_status": {
+                "percent_complete": 42.7,
+                "estimated_seconds_remaining": "120",
+                "bytes_transferred": "5000000",
+                "bytes_total": "10000000",
+                "throughput_current": "250000",
+                "throughput_overall": "200000"
+            }
+        }]);
+        let statuses: Vec<ReplicationSourceStatus> = serde_json::from_value(data).unwrap();
+        assert_eq!(statuses.len(), 1);
+        let job = statuses[0].replication_job_status.as_ref().unwrap();
+        assert_eq!(job.percent_complete.as_deref(), Some("42.7"));
+        assert_eq!(job.throughput_current.as_deref(), Some("250000"));
+    }
+
+    #[test]
+    fn test_job_status_with_integer_throughput() {
+        // API might return throughput as a number too
+        let data = json!({
+            "percent_complete": 100,
+            "throughput_current": 131072000,
+            "throughput_overall": 98304000
+        });
+        let status: ReplicationJobStatus = serde_json::from_value(data).unwrap();
+        assert_eq!(status.percent_complete.as_deref(), Some("100"));
+        assert_eq!(status.throughput_current.as_deref(), Some("131072000"));
+        assert_eq!(status.throughput_overall.as_deref(), Some("98304000"));
     }
 }
