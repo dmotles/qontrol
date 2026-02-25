@@ -6,7 +6,7 @@ use super::types::*;
 /// Render the CDF graph as a grouped-by-cluster adjacency table with status columns.
 ///
 /// Format: cluster heading, then indented rows showing target, type, mode, status, lag, throughput.
-pub fn render_table(graph: &CdfGraph, detail: bool) -> String {
+pub fn render_table(graph: &CdfGraph) -> String {
     if graph.node_count() == 0 {
         return "(no CDF relationships found)\n".to_string();
     }
@@ -21,8 +21,8 @@ pub fn render_table(graph: &CdfGraph, detail: bool) -> String {
 
     for src_idx in &source_nodes {
         let edges: Vec<_> = graph.edges(*src_idx).collect();
-        if edges.is_empty() && !detail {
-            // In non-detail mode, skip nodes with no outgoing edges
+        if edges.is_empty() {
+            // Skip nodes with no outgoing edges
             // unless they also have no incoming edges (isolated)
             let incoming: Vec<_> = graph
                 .edges_directed(*src_idx, petgraph::Direction::Incoming)
@@ -45,7 +45,7 @@ pub fn render_table(graph: &CdfGraph, detail: bool) -> String {
             for edge_ref in &edges {
                 let target_node = &graph[edge_ref.target()];
                 let edge = edge_ref.weight();
-                render_edge_row(&mut out, target_node, edge, detail);
+                render_edge_row(&mut out, target_node, edge);
             }
         }
         out.push('\n');
@@ -96,9 +96,9 @@ fn render_column_headers(out: &mut String) {
     ));
 }
 
-fn render_edge_row(out: &mut String, target: &CdfNode, edge: &CdfEdge, detail: bool) {
+fn render_edge_row(out: &mut String, target: &CdfNode, edge: &CdfEdge) {
     let target_name = node_label(target);
-    let (edge_type, mode, status, lag, throughput) = extract_edge_fields(edge, detail);
+    let (edge_type, mode, status, lag, throughput) = extract_edge_fields(edge);
 
     let style = edge_style(edge);
     let status_style = status_color(&status);
@@ -114,11 +114,10 @@ fn render_edge_row(out: &mut String, target: &CdfNode, edge: &CdfEdge, detail: b
     ));
 }
 
-fn extract_edge_fields(edge: &CdfEdge, detail: bool) -> (String, String, String, String, String) {
+fn extract_edge_fields(edge: &CdfEdge) -> (String, String, String, String, String) {
     match edge {
         CdfEdge::Portal {
             portal_type,
-            state,
             status,
             ..
         } => {
@@ -128,11 +127,7 @@ fn extract_edge_fields(edge: &CdfEdge, detail: bool) -> (String, String, String,
                 .to_lowercase()
                 .replace('_', "-");
             let mode = short_type.clone();
-            let display_status = if detail {
-                format!("{}/{}", state.to_lowercase(), status.to_lowercase())
-            } else {
-                status.to_lowercase()
-            };
+            let display_status = status.to_lowercase();
             ("portal".into(), mode, display_status, "-".into(), "-".into())
         }
         CdfEdge::Replication {
@@ -416,14 +411,14 @@ mod tests {
     #[test]
     fn test_render_table_empty() {
         let graph = CdfGraph::new();
-        let output = render_table(&graph, false);
+        let output = render_table(&graph);
         assert_eq!(output, "(no CDF relationships found)\n");
     }
 
     #[test]
     fn test_render_table_header() {
         let graph = make_test_graph();
-        let output = render_table(&graph, false);
+        let output = render_table(&graph);
         assert!(output.contains("Data Fabric Status"));
         assert!(output.contains("3 clusters, 3 relationships"));
     }
@@ -431,7 +426,7 @@ mod tests {
     #[test]
     fn test_render_table_cluster_headings() {
         let graph = make_test_graph();
-        let output = render_table(&graph, false);
+        let output = render_table(&graph);
         assert!(output.contains("gravytrain"));
         assert!(output.contains("iss"));
     }
@@ -439,7 +434,7 @@ mod tests {
     #[test]
     fn test_render_table_edge_rows() {
         let graph = make_test_graph();
-        let output = render_table(&graph, false);
+        let output = render_table(&graph);
         // Check replication row
         assert!(output.contains("repl"));
         assert!(output.contains("continuous"));
@@ -456,7 +451,7 @@ mod tests {
     #[test]
     fn test_render_table_throughput() {
         let graph = make_test_graph();
-        let output = render_table(&graph, false);
+        let output = render_table(&graph);
         assert!(output.contains("MB/s"));
     }
 
@@ -524,7 +519,7 @@ mod tests {
                 replication_job_status: None,
             },
         );
-        let output = render_table(&graph, false);
+        let output = render_table(&graph);
         assert!(output.contains("disabled"));
     }
 }

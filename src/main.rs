@@ -173,7 +173,6 @@ fn run(cli: Cli) -> Result<()> {
         }
         Commands::Cdf { command } => match command {
             CdfCommands::Status {
-                detail,
                 graph,
                 cluster,
                 profiles,
@@ -184,7 +183,6 @@ fn run(cli: Cli) -> Result<()> {
                     &config,
                     &profiles,
                     cli.global_opts.json,
-                    detail,
                     graph,
                     cluster.as_deref(),
                     problems_only,

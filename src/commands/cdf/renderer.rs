@@ -9,8 +9,7 @@ use super::types::*;
 /// Render the CDF graph as a visually striking cluster-centric topology map.
 ///
 /// Returns a string with embedded ANSI codes (via `console` crate).
-/// `detail` enables per-edge metadata like paths, modes, states.
-pub fn render(graph: &CdfGraph, detail: bool) -> String {
+pub fn render(graph: &CdfGraph) -> String {
     if graph.node_count() == 0 {
         return "(no CDF relationships found)\n".to_string();
     }
@@ -24,7 +23,7 @@ pub fn render(graph: &CdfGraph, detail: bool) -> String {
         return out;
     }
 
-    render_cluster_connections(&mut out, &topo, detail);
+    render_cluster_connections(&mut out, &topo);
     render_s3_section(&mut out, &topo);
     render_remote_peers_section(&mut out, &topo);
     render_legend(&mut out, &topo);
@@ -473,7 +472,7 @@ fn render_single_node(out: &mut String, graph: &CdfGraph) {
     }
 }
 
-fn render_cluster_connections(out: &mut String, topo: &Topology, detail: bool) {
+fn render_cluster_connections(out: &mut String, topo: &Topology) {
     if topo.cluster_pairs.is_empty() && topo.isolated_clusters.is_empty() {
         return;
     }
@@ -488,7 +487,7 @@ fn render_cluster_connections(out: &mut String, topo: &Topology, detail: bool) {
     ));
 
     for bundle in &topo.cluster_pairs {
-        render_pair_line(out, bundle, detail);
+        render_pair_line(out, bundle);
         out.push('\n');
     }
 
@@ -502,7 +501,7 @@ fn render_cluster_connections(out: &mut String, topo: &Topology, detail: bool) {
     }
 }
 
-fn render_pair_line(out: &mut String, bundle: &ClusterPairBundle, _detail: bool) {
+fn render_pair_line(out: &mut String, bundle: &ClusterPairBundle) {
     let a = &bundle.cluster_a;
     let b = &bundle.cluster_b;
 
@@ -871,7 +870,7 @@ mod tests {
     #[test]
     fn test_render_empty_graph() {
         let graph = CdfGraph::new();
-        let output = render(&graph, false);
+        let output = render(&graph);
         assert_eq!(output, "(no CDF relationships found)\n");
     }
 
@@ -883,7 +882,7 @@ mod tests {
             uuid: "uuid-1234".into(),
             address: "10.0.0.1".into(),
         });
-        let output = render(&graph, false);
+        let output = render(&graph);
         let plain = strip_ansi(&output);
         assert!(plain.contains("lonely"));
         assert!(plain.contains("Data Fabric Topology"));
@@ -893,7 +892,7 @@ mod tests {
     #[test]
     fn test_render_compact_mode() {
         let graph = make_test_graph();
-        let output = render(&graph, false);
+        let output = render(&graph);
         let plain = strip_ansi(&output);
 
         // Verify header
@@ -917,19 +916,6 @@ mod tests {
         assert!(plain.contains("one-way"));
     }
 
-    #[test]
-    fn test_render_detail_mode() {
-        let graph = make_test_graph();
-        let output = render(&graph, true);
-        let plain = strip_ansi(&output);
-
-        // Detail mode should still show the topology
-        assert!(plain.contains("CLUSTER CONNECTIONS"));
-        assert!(plain.contains("gravytrain"));
-        assert!(plain.contains("iss"));
-        assert!(plain.contains("repl"));
-        assert!(plain.contains("portal"));
-    }
 
     #[test]
     fn test_render_unknown_cluster() {
@@ -958,7 +944,7 @@ mod tests {
                 replication_job_status: None,
             },
         );
-        let output = render(&graph, false);
+        let output = render(&graph);
         let plain = strip_ansi(&output);
         assert!(plain.contains("REMOTE PEERS"));
         assert!(plain.contains("10.0.0.99"));
@@ -992,7 +978,7 @@ mod tests {
                 replication_job_status: None,
             },
         );
-        let output = render(&graph, false);
+        let output = render(&graph);
         let plain = strip_ansi(&output);
         assert!(
             plain.contains("DISABLED") || plain.contains("disabled"),
@@ -1024,7 +1010,7 @@ mod tests {
                 state: None,
             },
         );
-        let output = render(&graph, false);
+        let output = render(&graph);
         let plain = strip_ansi(&output);
         assert!(plain.contains("cluster-a"));
         assert!(plain.contains("my-bucket"));
@@ -1034,7 +1020,7 @@ mod tests {
     #[test]
     fn test_render_output_valid_utf8() {
         let graph = make_test_graph();
-        let output = render(&graph, false);
+        let output = render(&graph);
         assert!(!output.is_empty());
 
         // Verify box-drawing characters
@@ -1073,7 +1059,7 @@ mod tests {
                 replication_job_status: None,
             },
         );
-        let output = render(&graph, false);
+        let output = render(&graph);
         let plain = strip_ansi(&output);
         assert!(plain.contains("10.0.0.1") || plain.contains("10.0.0.2"));
     }
@@ -1158,7 +1144,7 @@ mod tests {
             },
         );
 
-        let output = render(&graph, false);
+        let output = render(&graph);
         let plain = strip_ansi(&output);
 
         // Should show "×3" for collapsed edges
@@ -1174,7 +1160,7 @@ mod tests {
     #[test]
     fn test_output_width_under_80() {
         let graph = make_test_graph();
-        let output = render(&graph, false);
+        let output = render(&graph);
         let plain = strip_ansi(&output);
         for line in plain.lines() {
             let width = console::measure_text_width(line);
@@ -1190,7 +1176,7 @@ mod tests {
     #[test]
     fn test_legend_present() {
         let graph = make_test_graph();
-        let output = render(&graph, false);
+        let output = render(&graph);
         let plain = strip_ansi(&output);
         assert!(plain.contains("repl"));
         assert!(plain.contains("portal"));
@@ -1231,7 +1217,7 @@ mod tests {
                 replication_job_status: None,
             },
         );
-        let output = render(&graph, false);
+        let output = render(&graph);
         let plain = strip_ansi(&output);
         assert!(
             plain.contains("lonely-cluster"),
@@ -1286,7 +1272,7 @@ mod tests {
                 replication_job_status: None,
             },
         );
-        let output = render(&graph, false);
+        let output = render(&graph);
         let plain = strip_ansi(&output);
         // Should detect bidirectional
         assert!(

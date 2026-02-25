@@ -277,9 +277,6 @@ pub enum CdfCommands {
     /// Show inter-cluster data fabric relationships
     #[command(alias = "st")]
     Status {
-        /// Show verbose per-relationship details
-        #[arg(long)]
-        detail: bool,
         /// Show ASCII topology graph instead of table
         #[arg(long)]
         graph: bool,

@@ -55,7 +55,6 @@ pub fn run(
     config: &Config,
     profiles: &[String],
     json_mode: bool,
-    detail: bool,
     graph_mode: bool,
     cluster_filter: Option<&str>,
     problems_only: bool,
@@ -85,10 +84,10 @@ pub fn run(
         let json = collector::graph_to_json(&graph);
         println!("{}", serde_json::to_string_pretty(&json)?);
     } else if graph_mode {
-        let output = renderer::render(&graph, detail);
+        let output = renderer::render(&graph);
         print!("{}", output);
     } else {
-        let output = renderer_table::render_table(&graph, detail);
+        let output = renderer_table::render_table(&graph);
         print!("{}", output);
     }
 
