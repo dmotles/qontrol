@@ -5,7 +5,7 @@ use super::types::*;
 
 /// Render the CDF graph as a grouped-by-cluster adjacency table with status columns.
 ///
-/// Format: cluster heading, then indented rows showing target, type, mode, status, lag, throughput.
+/// Format: cluster heading, then indented rows showing target, type, mode, status, lag, path.
 pub fn render_table(graph: &CdfGraph) -> String {
     if graph.node_count() == 0 {
         return "(no CDF relationships found)\n".to_string();
@@ -86,13 +86,13 @@ fn render_cluster_heading(out: &mut String, node: &CdfNode) {
 fn render_column_headers(out: &mut String) {
     let dim = Style::new().dim();
     out.push_str(&format!(
-        "  {:<22} {:<8} {:<12} {:<20} {:<12} {}\n",
+        "  {:<22} {:<8} {:<12} {:<12} {:<8} {}\n",
         dim.apply_to("TARGET"),
         dim.apply_to("TYPE"),
         dim.apply_to("MODE"),
-        dim.apply_to("PATH"),
         dim.apply_to("STATUS"),
         dim.apply_to("LAG"),
+        dim.apply_to("PATH"),
     ));
 }
 
@@ -104,13 +104,13 @@ fn render_edge_row(out: &mut String, target: &CdfNode, edge: &CdfEdge) {
     let status_style = status_color(&status);
 
     out.push_str(&format!(
-        "  {:<22} {:<8} {:<12} {:<20} {} {}\n",
+        "  {:<22} {:<8} {:<12} {} {} {}\n",
         style.apply_to(truncate(&target_name, 22)),
         style.apply_to(&edge_type),
         mode,
-        truncate(&path, 20),
         pad_styled(&status_style.apply_to(&status).to_string(), &status, 12),
-        lag,
+        pad_styled(&lag, &lag, 8),
+        path,
     ));
 }
 
