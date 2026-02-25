@@ -86,39 +86,41 @@ fn render_cluster_heading(out: &mut String, node: &CdfNode) {
 fn render_column_headers(out: &mut String) {
     let dim = Style::new().dim();
     out.push_str(&format!(
-        "  {:<24} {:<8} {:<14} {:<14} {:<14} {}\n",
+        "  {:<22} {:<8} {:<12} {:<20} {:<12} {}\n",
         dim.apply_to("TARGET"),
         dim.apply_to("TYPE"),
         dim.apply_to("MODE"),
+        dim.apply_to("PATH"),
         dim.apply_to("STATUS"),
         dim.apply_to("LAG"),
-        dim.apply_to("THROUGHPUT"),
     ));
 }
 
 fn render_edge_row(out: &mut String, target: &CdfNode, edge: &CdfEdge) {
     let target_name = node_label(target);
-    let (edge_type, mode, status, lag, throughput) = extract_edge_fields(edge);
+    let (edge_type, mode, path, status, lag) = extract_edge_fields(edge);
 
     let style = edge_style(edge);
     let status_style = status_color(&status);
 
     out.push_str(&format!(
-        "  {:<24} {:<8} {:<14} {} {:<14} {}\n",
-        style.apply_to(truncate(&target_name, 24)),
+        "  {:<22} {:<8} {:<12} {:<20} {} {}\n",
+        style.apply_to(truncate(&target_name, 22)),
         style.apply_to(&edge_type),
         mode,
-        pad_styled(&status_style.apply_to(&status).to_string(), &status, 14),
+        truncate(&path, 20),
+        pad_styled(&status_style.apply_to(&status).to_string(), &status, 12),
         lag,
-        throughput,
     ));
 }
 
+/// Returns (type, mode, path, status, lag).
 fn extract_edge_fields(edge: &CdfEdge) -> (String, String, String, String, String) {
     match edge {
         CdfEdge::Portal {
             portal_type,
             status,
+            roots,
             ..
         } => {
             let short_type = portal_type
@@ -128,15 +130,21 @@ fn extract_edge_fields(edge: &CdfEdge) -> (String, String, String, String, Strin
                 .replace('_', "-");
             let mode = short_type.clone();
             let display_status = status.to_lowercase();
-            ("portal".into(), mode, display_status, "-".into(), "-".into())
+            let path = if roots.is_empty() {
+                "-".into()
+            } else {
+                roots.join(", ")
+            };
+            ("portal".into(), mode, path, display_status, "-".into())
         }
         CdfEdge::Replication {
+            source_path,
+            target_path,
             mode,
             enabled,
             state,
             job_state,
             recovery_point,
-            replication_job_status,
             ..
         } => {
             let short_mode = shorten_mode(
@@ -154,12 +162,14 @@ fn extract_edge_fields(edge: &CdfEdge) -> (String, String, String, String, Strin
             };
 
             let lag = format_recovery_lag(recovery_point.as_deref());
-            let throughput = format_throughput(replication_job_status.as_ref());
 
-            ("repl".into(), short_mode, status, lag, throughput)
+            let path = format_replication_path(source_path.as_deref(), target_path.as_deref());
+
+            ("repl".into(), short_mode, path, status, lag)
         }
         CdfEdge::ObjectReplication {
             direction,
+            folder,
             state,
             ..
         } => {
@@ -172,11 +182,12 @@ fn extract_edge_fields(edge: &CdfEdge) -> (String, String, String, String, Strin
             let status = shorten_status(
                 &state.as_deref().unwrap_or("?").to_lowercase(),
             );
+            let path = folder.as_deref().unwrap_or("-").to_string();
             (
                 "S3".into(),
                 short_dir.into(),
+                path,
                 status,
-                "-".into(),
                 "-".into(),
             )
         }
@@ -241,30 +252,13 @@ fn format_recovery_lag(recovery_point: Option<&str>) -> String {
     }
 }
 
-fn format_throughput(job_status: Option<&ReplicationJobStatus>) -> String {
-    let Some(js) = job_status else {
-        return "-".into();
-    };
-
-    if let Some(tp) = &js.throughput_current {
-        if let Ok(bytes_per_sec) = tp.parse::<f64>() {
-            return format_bytes_per_sec(bytes_per_sec);
-        }
-        return tp.clone();
-    }
-
-    "-".into()
-}
-
-fn format_bytes_per_sec(bps: f64) -> String {
-    if bps >= 1_073_741_824.0 {
-        format!("{:.1} GB/s", bps / 1_073_741_824.0)
-    } else if bps >= 1_048_576.0 {
-        format!("{:.1} MB/s", bps / 1_048_576.0)
-    } else if bps >= 1024.0 {
-        format!("{:.1} KB/s", bps / 1024.0)
-    } else {
-        format!("{:.0} B/s", bps)
+fn format_replication_path(source: Option<&str>, target: Option<&str>) -> String {
+    match (source, target) {
+        (Some(s), Some(t)) if s == t => s.to_string(),
+        (Some(s), Some(t)) => format!("{} \u{2192} {}", s, t),
+        (Some(s), None) => s.to_string(),
+        (None, Some(t)) => t.to_string(),
+        (None, None) => "-".into(),
     }
 }
 
@@ -393,6 +387,7 @@ mod tests {
                 portal_type: "PORTAL_READ_WRITE".into(),
                 state: "ACCEPTED".into(),
                 status: "ACTIVE".into(),
+                roots: vec!["/data".into()],
             },
         );
         graph.add_edge(
@@ -449,18 +444,24 @@ mod tests {
     }
 
     #[test]
-    fn test_render_table_throughput() {
+    fn test_render_table_path_column() {
         let graph = make_test_graph();
         let output = render_table(&graph);
-        assert!(output.contains("MB/s"));
+        // Replication edge should show "src → dst" path
+        assert!(output.contains("/data"));
+        // Portal edge should show roots
+        assert!(output.contains("/data"));
+        // S3 edge should show folder
+        assert!(output.contains("daily/"));
     }
 
     #[test]
-    fn test_format_bytes_per_sec() {
-        assert_eq!(format_bytes_per_sec(500.0), "500 B/s");
-        assert_eq!(format_bytes_per_sec(1500.0), "1.5 KB/s");
-        assert_eq!(format_bytes_per_sec(1_500_000.0), "1.4 MB/s");
-        assert_eq!(format_bytes_per_sec(1_500_000_000.0), "1.4 GB/s");
+    fn test_format_replication_path() {
+        assert_eq!(format_replication_path(Some("/src"), Some("/dst")), "/src \u{2192} /dst");
+        assert_eq!(format_replication_path(Some("/same"), Some("/same")), "/same");
+        assert_eq!(format_replication_path(Some("/src"), None), "/src");
+        assert_eq!(format_replication_path(None, Some("/dst")), "/dst");
+        assert_eq!(format_replication_path(None, None), "-");
     }
 
     #[test]
